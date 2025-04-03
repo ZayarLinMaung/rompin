@@ -1,0 +1,144 @@
+.unit-card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  margin-bottom: 15px;
+  border-left: 4px solid transparent;
+  border: 1px solid #ddd;
+  padding: 1rem;
+  margin: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.unit-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.unit-card.available {
+  border-left-color: #28a745;
+}
+
+.unit-card.reserved {
+  border-left-color: #ffc107;
+}
+
+.unit-card.booked {
+  border-left-color: #dc3545;
+}
+
+.unit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.unit-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-badge.available {
+  background-color: #e6f4ea;
+  color: #1e7e34;
+}
+
+.status-badge.reserved {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.booked {
+  background-color: #dc3545;
+  color: white;
+}
+
+.unit-details {
+  margin-bottom: 15px;
+}
+
+.unit-details p {
+  margin: 8px 0;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.unit-details strong {
+  color: #333;
+  margin-right: 5px;
+}
+
+.unit-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.edit-btn {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.edit-btn:hover {
+  background-color: #bbdefb;
+}
+
+.book-btn {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.book-btn:hover {
+  background-color: #c8e6c9;
+}
+
+.view-btn {
+  background-color: #6c757d;
+  color: white;
+  width: 100%;
+}
+
+.view-btn:hover {
+  background-color: #5a6268;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .unit-card {
+    padding: 15px;
+  }
+
+  .unit-header h3 {
+    font-size: 1.1em;
+  }
+
+  .unit-details p {
+    font-size: 0.85em;
+  }
+
+  .action-btn {
+    padding: 6px 12px;
+    font-size: 0.85em;
+  }
+}
