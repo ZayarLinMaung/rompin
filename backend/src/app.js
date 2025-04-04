@@ -2,12 +2,24 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const mongoose = require("mongoose");
+const domainHandler = require("./middleware/domainHandler");
 require("dotenv").config();
 
 const app = express();
 
+// Domain handling middleware
+app.use(domainHandler);
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.ALLOWED_DOMAINS ? 
+    process.env.ALLOWED_DOMAINS.split(',').map(domain => `https://${domain}`) : 
+    '*',
+  credentials: true
+};
+app.use(cors(corsOptions));
+
 // Middleware
-app.use(cors());
 app.use(express.json());
 
 // Serve static files from the uploads directory

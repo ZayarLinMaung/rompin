@@ -285,23 +285,34 @@ const AdminDashboard = () => {
   };
 
   const getFloorNumbers = () => {
-    const floors = [];
-    for (let i = 4; i <= 39; i++) {
-      floors.push(i);
-    }
-    return floors;
+    return Array.from({ length: 36 }, (_, i) => i + 4).sort((a, b) => a - b);
   };
 
   const getCurrentPageFloors = () => {
     const floors = getFloorNumbers();
-    const itemsPerPage = 16; // 4x4 grid
+    // Check if we're on mobile using window width
+    const isMobile = window.innerWidth <= 768;
+    const itemsPerPage = isMobile ? 6 : 18; // Use 6 for mobile, 18 for desktop
     const startIndex = (currentFloorPage - 1) * itemsPerPage;
     return floors.slice(startIndex, startIndex + itemsPerPage);
   };
 
   const getTotalFloorPages = () => {
-    return Math.ceil((39 - 4 + 1) / 16); // (39-4+1) total floors divided by items per page
+    const isMobile = window.innerWidth <= 768;
+    const itemsPerPage = isMobile ? 6 : 18;
+    return Math.ceil((39 - 4 + 1) / itemsPerPage);
   };
+
+  // Add window resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      // Force re-render when window is resized to update pagination
+      setCurrentFloorPage(1);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const getUnitsForFloor = () => {
     if (!selectedFloor || !selectedFacing) return [];
@@ -505,17 +516,19 @@ const AdminDashboard = () => {
                 <div className="floor-units">
                   <div className="floor-header">
                     <div className="header-left">
+                      <h3>Floor {selectedFloor} Units</h3>
+                    </div>
+                    <div className="header-right">
                       <button
                         className="back-button"
                         onClick={() => setSelectedFloor(null)}
                       >
                         ← Back to Floors
                       </button>
-                      <h3>Floor {selectedFloor} Units</h3>
+                      <button className="add-unit-btn" onClick={handleAddUnit}>
+                        Add New Unit
+                      </button>
                     </div>
-                    <button className="add-unit-btn" onClick={handleAddUnit}>
-                      Add New Unit
-                    </button>
                   </div>
                   <div className="units-grid">
                     {getPagedUnits().map((unit) => (

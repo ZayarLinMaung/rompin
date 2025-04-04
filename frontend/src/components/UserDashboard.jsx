@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import ReservationForm from "./ReservationForm";
 import UserReservations from "./UserReservations";
+import "./UserDashboard.css";
 
 const UserDashboard = ({ user: initialUser }) => {
   const [activeView, setActiveView] = useState("overview");
@@ -9,7 +10,7 @@ const UserDashboard = ({ user: initialUser }) => {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [floorPage, setFloorPage] = useState(1);
-  const floorsPerPage = 12;
+  const floorsPerPage = 18;
   const unitsPerPage = 12;
   const [units, setUnits] = useState({ total: 0, groupedUnits: {}, units: [] });
   const [loading, setLoading] = useState(true);
@@ -580,23 +581,35 @@ const UserDashboard = ({ user: initialUser }) => {
     return (
       <div className="units-section">
         <div className="units-header">
-          <h3>
-            {selectedView === "lake"
-              ? "Lake View Units"
-              : "Facility View Units"}
-          </h3>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setSelectedView(null);
-              setSelectedFloor(null);
-              setCurrentPage(1);
-              setFloorPage(1);
-              setActiveView("overview");
-            }}
-          >
-            Back to Overview
-          </button>
+          <h3>{selectedView === "lake" ? "Lake View Units" : "Facility View Units"}</h3>
+          <div className="header-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setSelectedView(null);
+                setSelectedFloor(null);
+                setCurrentPage(1);
+                setFloorPage(1);
+                setActiveView("overview");
+                setSelectedUnitId(null);
+              }}
+            >
+              Back to Overview
+            </button>
+            {selectedFloor && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSelectedFloor(null);
+                  setFloorPage(1);
+                  setSelectedUnitId(null);
+                  setCurrentPage(1);
+                }}
+              >
+                Back to Floors
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -636,20 +649,6 @@ const UserDashboard = ({ user: initialUser }) => {
           </>
         ) : (
           <div className="floor-detail">
-            <div className="floor-header">
-              <h4 className="floor-title">
-                Floor {formatFloorNumber(selectedFloor)}
-              </h4>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setSelectedFloor(null);
-                  setCurrentPage(1);
-                }}
-              >
-                Back to Floors
-              </button>
-            </div>
             <div className="units-grid-3x4">
               {paginateUnits(
                 validFloors[selectedFloor].sort((a, b) => {
@@ -824,7 +823,7 @@ const UserDashboard = ({ user: initialUser }) => {
   };
 
   return (
-    <div className="user-dashboard">
+    <div className="admin-dashboard user-dashboard">
       <div className="dashboard-header">
         <h2>Welcome, {initialUser.name}</h2>
         <div className="view-navigation">
