@@ -1,10 +1,10 @@
-# MTerra File Upload System
+# Rompin File Upload System
 
-This guide explains how the file upload system works in MTerra and how to troubleshoot common issues.
+This guide explains how the file upload system works in Rompin and how to troubleshoot common issues.
 
 ## Overview
 
-The MTerra Real Estate Management System allows users to upload two types of documents:
+The Rompin Real Estate Management System allows users to upload two types of documents:
 
 1. **IC Softcopy**: Personal identification documents
 2. **Proof of Payment**: Payment receipts or bank transfer confirmations
@@ -53,7 +53,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 If there's inconsistency in how paths are stored (absolute vs. relative paths), fix them with:
 
 ```bash
-mongosh mterra --eval 'db.bookings.find().forEach(function(doc) { 
+mongosh rompin --eval 'db.bookings.find().forEach(function(doc) { 
   if(doc.icSoftcopy) { 
     const filename = doc.icSoftcopy.split("/").pop(); 
     db.bookings.updateOne({_id: doc._id}, {$set: {icSoftcopy: "uploads/" + filename}}); 
@@ -109,51 +109,5 @@ To verify file uploads are working:
 2. Check the database entries:
 
 ```bash
-mongosh mterra --eval "db.bookings.findOne({}, {icSoftcopy:1, proofOfPayment:1, _id:0})" | cat
+mongosh rompin --eval "db.bookings.findOne({}, {icSoftcopy:1, proofOfPayment:1, _id:0})" | cat
 ```
-
-3. Verify the files exist in the uploads directory:
-
-```bash
-ls -la backend/uploads/
-```
-
-4. Test direct file access with curl:
-
-```bash
-curl -I http://localhost:5000/uploads/[filename].jpg
-```
-
-## Troubleshooting Steps
-
-If uploads are still not working:
-
-1. Check server logs for errors when uploading files
-
-2. Ensure MongoDB connection is working properly
-
-3. Verify the client is correctly sending files in multipart/form-data format
-
-4. Check that the paths in both upload routes are consistent:
-   - `backend/src/routes/bookings.js`
-   - `backend/src/routes/units.js`
-
-5. Restart the server after making changes to the uploads directory
-
-## Security Considerations
-
-The current implementation accepts:
-- Images (any format)
-- PDFs
-
-File size is limited to 5MB. Consider adjusting these settings in `upload.js` for production use:
-
-```javascript
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-});
-``` 

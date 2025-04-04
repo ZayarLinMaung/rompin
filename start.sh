@@ -29,7 +29,7 @@ function cleanup {
 # Register the cleanup function for these signals
 trap cleanup SIGINT SIGTERM
 
-echo "MTerra is running!"
+echo "Rompin is running!"
 echo "Backend: http://localhost:5000"
 echo "Frontend: http://localhost:5173"
 echo "Press Ctrl+C to stop all services"

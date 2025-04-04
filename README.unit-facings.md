@@ -1,10 +1,10 @@
-# MTerra Unit Facing Configuration Guide
+# Rompin Unit Facing Configuration Guide
 
-This guide explains how the unit facing configuration works in MTerra and how to customize it according to your needs.
+This guide explains how the unit facing configuration works in Rompin and how to customize it according to your needs.
 
 ## Overview
 
-In the MTerra Real Estate Management System, properties are categorized by their facing direction. The system supports the following facings:
+In the Rompin Real Estate Management System, properties are categorized by their facing direction. The system supports the following facings:
 
 - **Lake View**: Units with a view of the lake
 - **Facility View North**: Units facing north toward facilities
@@ -145,17 +145,6 @@ This will:
 To verify that the changes were applied correctly, you can check the database:
 
 ```bash
-mongosh mterra --eval "db.units.count({facing: 'Lake View'})" | cat
-mongosh mterra --eval "db.units.count({facing: 'Facility View North'})" | cat
+mongosh rompin --eval "db.units.count({facing: 'Lake View'})" | cat
+mongosh rompin --eval "db.units.count({facing: 'Facility View North'})" | cat
 ```
-
-## For New Installations
-
-For new installations, the facings will be assigned when you run the seed scripts:
-
-```bash
-cd backend
-npm run seed:units
-```
-
-This will create units with facings assigned according to the rules in the seed scripts. 

@@ -10,6 +10,15 @@ const app = express();
 // Domain handling middleware
 app.use(domainHandler);
 
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
 // CORS configuration
 const corsOptions = {
   origin: process.env.ALLOWED_DOMAINS ? 

@@ -38,7 +38,7 @@ const Dashboard = () => {
       <nav className="dashboard-nav">
         <div className="nav-content">
           <div className="nav-left">
-            <h1>MTerra Dashboard</h1>
+            <h1>Rompin Dashboard</h1>
           </div>
           <div className="nav-right">
             <span className="welcome-text">Welcome, {user.name}</span>

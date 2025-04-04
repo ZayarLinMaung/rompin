@@ -43,22 +43,23 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 const User = mongoose.model("User", userSchema);
 
 // Function to create admin user
-async function createAdminUser() {
+const createAdminUser = async () => {
   try {
-    const adminExists = await User.findOne({ email: "admin@mterra.com" });
+    const adminExists = await User.findOne({ email: "admin@rompin.com" });
     if (!adminExists) {
-      await User.create({
-        email: "admin@mterra.com",
+      const adminUser = new User({
+        name: "Admin",
+        email: "admin@rompin.com",
         password: "admin123456",
-        name: "Admin User",
         role: "admin",
       });
+      await adminUser.save();
       console.log("Admin user created successfully");
     }
   } catch (error) {
     console.error("Error creating admin user:", error);
   }
-}
+};
 
 module.exports = {
   User,

@@ -285,7 +285,7 @@ const UserDashboard = ({ user: initialUser }) => {
 
   const renderOverviewView = () => (
     <div className="overview-section">
-      <h3>Welcome to MTerra</h3>
+      <h3>Welcome to Rompin</h3>
       <div className="view-options">
         <div className="view-option lake-view">
           <div className="view-image">

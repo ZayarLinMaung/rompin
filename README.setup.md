@@ -1,6 +1,6 @@
-# MTerra Real Estate Management System - Setup Guide
+# Rompin Real Estate Management System - Setup Guide
 
-This guide covers how to set up and configure the MTerra Real Estate Management System on a Linux environment.
+This guide covers how to set up and configure the Rompin Real Estate Management System on a Linux environment.
 
 ## Prerequisites
 
@@ -13,8 +13,8 @@ This guide covers how to set up and configure the MTerra Real Estate Management 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/mterra.git
-cd mterra
+git clone https://github.com/your-username/rompin.git
+cd rompin
 ```
 
 ### 2. Install Dependencies
@@ -41,7 +41,7 @@ touch .env
 Add the following content to the `.env` file:
 
 ```
-MONGODB_URI=mongodb://localhost:27017/mterra
+MONGODB_URI=mongodb://localhost:27017/rompin
 JWT_SECRET=your-super-secret-key-change-this-in-production
 PORT=5000
 ```
@@ -90,7 +90,7 @@ function cleanup {
 # Register the cleanup function for these signals
 trap cleanup SIGINT SIGTERM
 
-echo "MTerra is running!"
+echo "Rompin is running!"
 echo "Backend: http://localhost:5000"
 echo "Frontend: http://localhost:5173"
 echo "Press Ctrl+C to stop all services"
@@ -103,7 +103,7 @@ wait
 
 ### 1. Seed Initial Data
 
-MTerra comes with scripts to seed the database with initial data:
+Rompin comes with scripts to seed the database with initial data:
 
 ```bash
 # Seed only the units

@@ -24,11 +24,11 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 console.log("Attempting to connect to MongoDB...");
 console.log(
   "MongoDB URI:",
-  process.env.MONGODB_URI || "mongodb://localhost:27017/mterra"
+  process.env.MONGODB_URI || "mongodb://localhost:27017/rompin"
 );
 
 mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/mterra", {
+  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/rompin", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
@@ -37,7 +37,7 @@ mongoose
     console.log("Connected to MongoDB successfully");
     console.log(
       "Database URI:",
-      process.env.MONGODB_URI || "mongodb://localhost:27017/mterra"
+      process.env.MONGODB_URI || "mongodb://localhost:27017/rompin"
     );
 
     // Test the connection by listing collections
@@ -58,7 +58,7 @@ mongoose
   .catch((err) => {
     console.error("MongoDB connection error:", err);
     console.error("Connection details:", {
-      uri: process.env.MONGODB_URI || "mongodb://localhost:27017/mterra",
+      uri: process.env.MONGODB_URI || "mongodb://localhost:27017/rompin",
       error: err.message,
       code: err.code,
       name: err.name,

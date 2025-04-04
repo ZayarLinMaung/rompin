@@ -1,4 +1,4 @@
-# MTerra Real Estate Management System
+# Rompin Real Estate Management System
 
 A comprehensive real estate management system for property developers and agents. This application allows management of property units, reservations, and customer bookings.
 
@@ -64,8 +64,8 @@ For detailed setup and usage instructions, refer to the following guides:
 1. Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/your-username/mterra.git
-cd mterra
+git clone https://github.com/your-username/rompin.git
+cd rompin
 
 # Backend
 cd backend
@@ -93,7 +93,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Project Structure
 
 ```
-mterra/
+rompin/
 ├── backend/
 │   ├── src/
 │   │   ├── middleware/
@@ -168,4 +168,3 @@ mterra/
 - [Express](https://expressjs.com/)
 - [MongoDB](https://www.mongodb.com/)
 - [Material UI](https://mui.com/)
-# rompin
