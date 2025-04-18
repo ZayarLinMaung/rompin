@@ -53,17 +53,30 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate request body
+    if (!email || !password) {
+      return res.status(400).json({ 
+        message: "Please provide both email and password" 
+      });
+    }
+
+    console.log('Login attempt for email:', email);
+
     // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log('Invalid password for user:', email);
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    console.log('Login successful for user:', email);
 
     // Create JWT token
     const payload = {
@@ -74,6 +87,7 @@ router.post("/login", async (req, res) => {
       expiresIn: "1h",
     });
 
+    // Send response
     res.json({
       token,
       user: {
@@ -84,8 +98,11 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error('Login error:', err);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 

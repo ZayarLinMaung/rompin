@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-const Login = () => {
+const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -10,6 +10,7 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleChange = (e) => {
     setFormData({
@@ -25,27 +26,75 @@ const Login = () => {
     setError(null);
 
     try {
-      const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        formData
-      );
-      console.log("Login response:", response.data); // Debug log
+      console.log('Attempting login with:', { email: formData.email });
+      
+      // First, test if the server is reachable
+      try {
+        const testResponse = await axios.get('http://localhost:5000/api/test');
+        console.log('Backend server is reachable:', testResponse.data);
+      } catch (testError) {
+        console.error('Backend server test failed:', testError);
+        throw new Error('Unable to connect to the server. Please make sure it is running.');
+      }
 
-      const { token, user } = response.data;
+      // Proceed with login
+      const response = await axios({
+        method: 'post',
+        url: 'http://localhost:5000/api/auth/login',
+        data: formData,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log("Login response:", response.data);
+
+      if (!response.data.token) {
+        throw new Error('No token received from server');
+      }
 
       // Store token and user data
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
 
-      console.log("Stored user data:", user); // Debug log
+      // Update user state in App component
+      setUser(response.data.user);
 
-      // Navigate to dashboard
-      navigate("/");
+      console.log("Stored user data:", response.data.user);
+
+      // Route based on user role
+      if (response.data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        // Get the redirect URL from query parameters or default to home
+        const params = new URLSearchParams(location.search);
+        const redirectUrl = params.get('redirect') || '/';
+        navigate(redirectUrl);
+      }
     } catch (err) {
-      console.error("Login error:", err.response?.data || err); // Debug log
-      setError(
-        err.response?.data?.message || "Failed to login. Please try again."
-      );
+      console.error("Login error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        headers: err.response?.headers,
+        config: err.config
+      });
+
+      if (err.response?.status === 400) {
+        setError(err.response.data.message || "Invalid credentials");
+      } else if (err.response?.status === 401) {
+        setError("Unauthorized. Please check your credentials.");
+      } else if (err.response?.status === 403) {
+        setError("Access forbidden. Please contact support.");
+      } else if (err.message.includes('Network Error')) {
+        setError("Unable to connect to the server. Please try again later.");
+      } else {
+        setError(
+          err.response?.data?.message || 
+          err.message || 
+          "Failed to login. Please check your credentials and try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -117,15 +166,14 @@ const Login = () => {
           </button>
         </form>
 
-        <p
-          className="helper-text"
-          style={{ marginTop: "1rem", textAlign: "center" }}
-        >
-          Don't have an account?{" "}
-          <a href="/register" className="form-link">
-            Register here
-          </a>
-        </p>
+        <div style={{ textAlign: "center", marginTop: "1rem" }}>
+          <p className="helper-text">
+            Don't have an account?{" "}
+            <a href="/register" className="form-link">
+              Sign up here
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

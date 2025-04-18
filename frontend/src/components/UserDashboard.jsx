@@ -1,26 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import ReservationForm from "./ReservationForm";
 import UserReservations from "./UserReservations";
 import "./UserDashboard.css";
 
 const UserDashboard = ({ user: initialUser }) => {
+  const isLoggedIn = !!localStorage.getItem('token');
+  const user = isLoggedIn ? initialUser : null;
+
   const [activeView, setActiveView] = useState("overview");
   const [selectedView, setSelectedView] = useState(null);
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [floorPage, setFloorPage] = useState(1);
   const floorsPerPage = 18;
-  const unitsPerPage = 12;
-  const [units, setUnits] = useState({ total: 0, groupedUnits: {}, units: [] });
+  const unitsPerPage = 6;
+  const [units, setUnits] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
-    name: initialUser.name,
-    email: initialUser.email,
-    phone: initialUser.phone || "",
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
     currentPassword: "",
     newPassword: "",
   });
@@ -31,118 +34,299 @@ const UserDashboard = ({ user: initialUser }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingError, setBookingError] = useState(null);
-
-  // Add polling interval state
   const [pollingInterval, setPollingInterval] = useState(null);
+  const [unitStatsData, setUnitStatsData] = useState({
+    'TERES FASA 1': { total: 0, present: 0, advise: 0, landowner: 0 },
+    'TERES FASA 2': { total: 0, present: 0, advise: 0, landowner: 0 },
+    'SEMI-D': { total: 0, present: 0, advise: 0, landowner: 0 }
+  });
 
-  // Set up polling when component mounts
+  // Update profileForm when user data changes
   useEffect(() => {
-    let isMounted = true;
-
-    // Initial fetch
-    if (selectedView || activeView === "reservations") {
-      fetchUnits();
+    if (isLoggedIn && user) {
+      setProfileForm(prev => ({
+        ...prev,
+        name: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+      }));
     }
+  }, [isLoggedIn, user]);
 
-    // Set up polling every 5 seconds, but don't poll when booking modal is open
-    const interval = setInterval(() => {
-      if (
-        (selectedView || activeView === "reservations") &&
-        isMounted &&
-        !showBookingModal
-      ) {
-        fetchUnits(false); // false means don't show loading state
+  // 1. Define all utility functions first
+  const getUnitType = useCallback((unitNumber) => {
+    const numericPart = parseInt(unitNumber.replace(/[^\d]/g, ''));
+    if (numericPart >= 1 && numericPart <= 37) return 'TERES FASA 1';
+    if (numericPart >= 38 && numericPart <= 74) return 'TERES FASA 2';
+    return 'SEMI-D';
+  }, []);
+
+  const getUnitStats = useCallback((type, unitsData) => {
+    if (!unitsData?.units) return { total: 0, available: 0, advise: 0, landowner: 0 };
+    
+    console.log("Processing units for", type, "Total units:", unitsData.units.length);
+    
+    const typeUnits = unitsData.units.filter(unit => {
+      const numericPart = parseInt(unit.unitNumber.replace(/[^\d]/g, ''));
+      let match = false;
+      switch (type) {
+        case "TERES FASA 1": match = (numericPart >= 1 && numericPart <= 37); break;
+        case "TERES FASA 2": match = (numericPart >= 38 && numericPart <= 74); break;
+        case "SEMI-D": match = (numericPart >= 75); break;
+        default: match = false;
       }
-    }, 5000);
-
-    setPollingInterval(interval);
-
-    // Cleanup on unmount
-    return () => {
-      isMounted = false;
-      if (interval) {
-        clearInterval(interval);
-      }
+      return match;
+    });
+    
+    console.log(`${type} units:`, typeUnits.length);
+    console.log(`${type} PRESENT units:`, typeUnits.filter(u => u.status === 'PRESENT').length);
+    
+    return {
+      total: typeUnits.length,
+      present: typeUnits.filter(unit => unit.status === 'PRESENT').length,
+      advise: typeUnits.filter(unit => unit.status === 'ADVISE').length,
+      landowner: typeUnits.filter(unit => unit.status === 'LANDOWNER UNIT').length
     };
-  }, [selectedView, activeView, showBookingModal]);
+  }, []);
 
-  const fetchUnits = async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
+  // 2. Define all memoized values
+  const processedUnits = useMemo(() => {
+    if (!units?.units) return [];
+    return units.units.map(unit => ({
+      ...unit,
+      type: getUnitType(unit.unitNumber)
+    }));
+  }, [units, getUnitType]);
+
+  const filteredUnits = useMemo(() => {
+    return processedUnits
+      .filter((unit) => !selectedView || unit.type === selectedView)
+      .sort((a, b) => {
+        const numA = parseInt(a.unitNumber.replace(/\D/g, ''));
+        const numB = parseInt(b.unitNumber.replace(/\D/g, ''));
+        return numA - numB;
+      });
+  }, [processedUnits, selectedView]);
+
+  const unitStats = useMemo(() => {
+    if (!processedUnits.length) return {};
+    // If we have unitStatsData, use that instead of calculating again
+    if (Object.keys(unitStatsData).length > 0 && 
+        unitStatsData['TERES FASA 1'] && 
+        unitStatsData['TERES FASA 2'] && 
+        unitStatsData['SEMI-D']) {
+      return unitStatsData;
     }
-    setError(null);
+    // Otherwise use the original calculation logic
+    return {
+      'TERES FASA 1': getUnitStats('TERES FASA 1', units),
+      'TERES FASA 2': getUnitStats('TERES FASA 2', units),
+      'SEMI-D': getUnitStats('SEMI-D', units)
+    };
+  }, [processedUnits, getUnitStats, units, unitStatsData]);
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("Authentication token not found. Please log in again.");
-      setLoading(false);
+  // 3. Define all event handlers
+  const handleBookUnit = (unit) => {
+    if (!isLoggedIn) {
+      // Redirect to login if user is not authenticated
+      const loginUrl = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      window.location.href = loginUrl;
       return;
     }
-
-    try {
-      const unitsResponse = await axios.get("http://localhost:5000/api/units", {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 10000, // 10 second timeout
-      });
-
-      // Process the units data
-      const processedUnits = {
-        ...unitsResponse.data,
-        units: unitsResponse.data.units.map((unit) => {
-          const [floor, unitNum] = unit.unitNumber.split("-");
-          const unitNumber = parseInt(unitNum, 10);
-          return {
-            ...unit,
-            facing:
-              unitNumber >= 8 && unitNumber <= 18
-                ? "Lake View"
-                : "Facility View",
-          };
-        }),
-      };
-
-      setUnits(processedUnits);
-    } catch (err) {
-      console.error("Error fetching units:", err);
-      if (err.code === "ECONNABORTED") {
-        setError("Request timed out. Please check your connection.");
-      } else {
-        setError(
-          err.response?.data?.message ||
-            "Error fetching units. Please try again."
-        );
-      }
-    } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleViewSelect = (view) => {
-    setSelectedView(view);
-    setActiveView("units");
-  };
-
-  const handleBookUnit = (unit) => {
-    console.log("Booking unit:", unit);
     setBookingUnit(unit);
     setShowBookingModal(true);
-    console.log("Modal should be open now");
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowBookingModal(false);
     setBookingUnit(null);
     setBookingError(null);
     setBookingSuccess(false);
+  }, []);
+
+  const handleViewSelect = useCallback((view) => {
+    setSelectedView(view);
+    setActiveView("units");
+  }, []);
+
+  // 4. Define data fetching
+  const fetchUnits = useCallback(async () => {
+    try {
+      console.log("Before API calls");
+      // Fetch units for rendering unit cards and details
+      const unitsResponse = await axios.get('http://localhost:5000/api/units');
+      
+      console.log("Units response data:", unitsResponse.data);
+      
+      if (JSON.stringify(unitsResponse.data) !== JSON.stringify(units)) {
+        setUnits(unitsResponse.data);
+        
+        // Since /types endpoint is failing, calculate stats directly from units data
+        if (unitsResponse.data && unitsResponse.data.units) {
+          const statsObject = {
+            'TERES FASA 1': getUnitStats('TERES FASA 1', unitsResponse.data),
+            'TERES FASA 2': getUnitStats('TERES FASA 2', unitsResponse.data),
+            'SEMI-D': getUnitStats('SEMI-D', unitsResponse.data)
+          };
+          setUnitStatsData(statsObject);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching units:', error);
+      setError(error.message);
+    } finally {
+        setLoading(false);
+      }
+  }, [getUnitType, units, getUnitStats]);
+
+  // 5. Define effects
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      if (!showBookingModal && isMounted) {
+        await fetchUnits();
+      }
+    };
+
+    fetchData();
+
+    let interval;
+    if (!showBookingModal) {
+      interval = setInterval(fetchData, 5000);
+      setPollingInterval(interval);
+    }
+
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [showBookingModal, fetchUnits]);
+
+  // Memoize the render functions
+  const getStatusClass = useCallback((status) => {
+    switch (status) {
+      case 'PRESENT':
+        return 'available';
+      case 'ADVISE':
+        return 'reserved';
+      case 'LANDOWNER UNIT':
+        return 'booked';
+      default:
+        return 'available';
+    }
+  }, []);
+
+  const getStatusText = useCallback((status) => {
+    switch (status) {
+      case 'PRESENT':
+        return 'Available';
+      case 'ADVISE':
+        return 'Advise';
+      case 'LANDOWNER UNIT':
+        return 'Landowner Unit';
+      default:
+        return status || 'Unknown';
+    }
+  }, []);
+
+  const renderUnitCard = (unit) => {
+    const isUnitAvailable = unit.status === "PRESENT";
+    
+    return (
+      <div key={unit._id} className="unit-row">
+        <div className="unit-cell unit-number">
+          <span>Unit {unit.unitNumber}</span>
+        </div>
+        <div className="unit-cell unit-type">
+          <span>{getUnitType(unit.unitNumber)}</span>
+        </div>
+        <div className="unit-cell unit-status">
+          <span className={`status-badge ${unit.status.toLowerCase().replace(/\s+/g, '-')}`}>
+            {getStatusText(unit.status)}
+          </span>
+        </div>
+        <div className="unit-cell unit-specs">
+          <div className="specs-grid">
+            <div className="spec-item">
+              <span className="spec-label">Built-Up:</span>
+              <span className="spec-value">{unit.specifications?.builtUp || '-'}</span>
+            </div>
+            <div className="spec-item">
+              <span className="spec-label">Land Size:</span>
+              <span className="spec-value">{unit.specifications?.landSize || '-'}</span>
+            </div>
+            <div className="spec-item">
+              <span className="spec-label">Extra Land:</span>
+              <span className="spec-value">{unit.specifications?.extraLand || '-'}</span>
+            </div>
+            <div className="spec-item">
+              <span className="spec-label">Bed/Bath:</span>
+              <span className="spec-value">{unit.specifications?.bedrooms || '-'}/{unit.specifications?.bathrooms || '-'}</span>
+            </div>
+          </div>
+        </div>
+        <div className="unit-cell unit-action">
+          {isUnitAvailable && (
+            <button
+              className="book-button"
+              onClick={() => handleBookUnit(unit)}
+            >
+              {isLoggedIn ? 'Book Now' : 'Login to Book'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
+
+  // Memoize pagination
+  const paginatedUnits = useMemo(() => {
+    const startIndex = (currentPage - 1) * unitsPerPage;
+    const endIndex = startIndex + unitsPerPage;
+    return filteredUnits.slice(startIndex, endIndex);
+  }, [filteredUnits, currentPage, unitsPerPage]);
+
+  const renderUnitsPagination = useCallback((totalUnits) => {
+    const totalPages = Math.ceil(totalUnits / unitsPerPage);
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="pagination">
+        <div className="pagination-info">
+          Showing {unitsPerPage * (currentPage - 1) + 1} to {Math.min(unitsPerPage * currentPage, totalUnits)} of {totalUnits} units
+        </div>
+        <div className="pagination-controls">
+          <button
+            className="pagination-button"
+            onClick={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            ←
+          </button>
+          <button
+            className="pagination-button"
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            →
+          </button>
+        </div>
+      </div>
+    );
+  }, [currentPage, unitsPerPage]);
 
   const handleBookingSubmit = async (values) => {
     try {
       setIsSubmitting(true);
       setBookingError(null);
       const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
+
+      console.log("Starting reservation process for unit:", bookingUnit);
 
       // Check if the unit is still available
       const unitResponse = await axios.get(
@@ -154,6 +338,8 @@ const UserDashboard = ({ user: initialUser }) => {
         }
       );
 
+      console.log("Unit availability check response:", unitResponse.data);
+
       if (!unitResponse.data.isAvailable) {
         setBookingError("This unit is no longer available for reservation.");
         setIsSubmitting(false);
@@ -162,18 +348,25 @@ const UserDashboard = ({ user: initialUser }) => {
 
       // Prepare the reservation data
       const reservationData = {
-        agencyName: values.agencyName,
-        agentName: values.agentName,
-        customerName: values.name,
-        customerIC: values.ic,
-        customerContact: values.contact,
-        customerAddress: values.address,
+        agencyName: values.agencyName || "",
+        agentName: values.agentName || "",
+        name: values.name || "",
+        ic: values.ic || "",
+        contact: values.contact || "",
+        address: values.address || "",
+        unitId: bookingUnit._id,
+        unitNumber: bookingUnit.unitNumber
       };
 
-      console.log("Sending reservation data:", reservationData);
+      console.log("Form values received:", values);
+      console.log("Prepared reservation data:", reservationData);
+      console.log("Request headers:", {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      });
 
       // First, create the reservation
-      const reservationResponse = await axios.put(
+      const reservationResponse = await axios.post(
         `http://localhost:5000/api/units/${bookingUnit._id}/reserve`,
         reservationData,
         {
@@ -196,6 +389,11 @@ const UserDashboard = ({ user: initialUser }) => {
           formData.append("icSoftcopy", values.icSoftcopy);
         }
 
+        console.log("Uploading files:", {
+          proofOfPayment: values.proofOfPayment ? "present" : "not present",
+          icSoftcopy: values.icSoftcopy ? "present" : "not present"
+        });
+
         await axios.post(
           `http://localhost:5000/api/units/${bookingUnit._id}/files`,
           formData,
@@ -214,7 +412,12 @@ const UserDashboard = ({ user: initialUser }) => {
       fetchUnits(); // Refresh the units list
       setActiveView("reservations"); // Switch to reservations view
     } catch (error) {
-      console.error("Booking error:", error);
+      console.error("Booking error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
       setIsSubmitting(false);
 
       // Handle validation errors
@@ -223,10 +426,11 @@ const UserDashboard = ({ user: initialUser }) => {
           ", "
         );
         setBookingError(`Validation error: ${errorMessages}`);
+      } else if (error.response?.data?.message) {
+        setBookingError(error.response.data.message);
       } else {
         setBookingError(
-          error.response?.data?.message ||
-            "Failed to submit booking. Please try again."
+          "Failed to submit booking. Please check your input and try again."
         );
       }
     }
@@ -283,384 +487,136 @@ const UserDashboard = ({ user: initialUser }) => {
     return String(floor).padStart(2, "0");
   };
 
-  const renderOverviewView = () => (
-    <div className="overview-section">
-      <h3>Welcome to Rompin</h3>
-      <div className="view-options">
-        <div className="view-option lake-view">
-          <div className="view-image">
-            <img
-              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1973&q=80"
-              alt="Lake View"
-            />
+  const renderUnitStats = (type) => {
+    const stats = getUnitStats(type, units);
+    return (
+      <div className="view-stats">
+        <div className="stat-info">
+          <div className="stat-row">
+            <span className="stat-label">TOTAL UNITS</span>
+            <span className="stat-value">{stats.total}</span>
           </div>
-          <div className="view-content">
-            <h4>Lake View</h4>
-            <p>
-              Experience the serene beauty of our lake-facing units with
-              stunning waterfront views.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => handleViewSelect("lake")}
-            >
-              Explore Lake View Units
-            </button>
+          <div className="stat-row">
+            <span className="stat-label">AVAILABLE</span>
+            <span className="stat-value">{stats.present}</span>
           </div>
+          <div className="stat-row">
+            <span className="stat-label">ADVISE</span>
+            <span className="stat-value">{stats.advise}</span>
         </div>
-        <div className="view-option facility-view">
-          <div className="view-image">
-            <img
-              src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1973&q=80"
-              alt="Facility View"
-            />
-          </div>
-          <div className="view-content">
-            <h4>Facility View</h4>
-            <p>
-              Enjoy convenient access to our world-class facilities and
-              amenities.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => handleViewSelect("facility")}
-            >
-              Explore Facility View Units
-            </button>
-          </div>
+          <div className="stat-row">
+            <span className="stat-label">LANDOWNER</span>
+            <span className="stat-value">{stats.landowner}</span>
         </div>
       </div>
     </div>
   );
-
-  // Filter and sort units
-  const getFilteredAndSortedUnits = () => {
-    if (!units?.units) return [];
-
-    return units.units.filter((unit) => {
-      // Filter by view type (lake or facility)
-      const [floor, unitNum] = unit.unitNumber.split("-");
-      const floorNumber = parseInt(floor, 10);
-      const unitNumber = parseInt(unitNum, 10);
-
-      // Only show units from floor 4 and above
-      if (floorNumber < 4) return false;
-
-      const isLakeView = unitNumber >= 8 && unitNumber <= 18;
-
-      if (selectedView === "lake") {
-        return isLakeView;
-      } else if (selectedView === "facility") {
-        return !isLakeView;
-      }
-      return true;
-    });
   };
 
-  const renderUnitsView = () => {
-    if (!units?.units) {
-      return <div className="loading">Loading units...</div>;
-    }
-
-    const filteredUnits = getFilteredAndSortedUnits();
-
-    // Group units by floor
-    const unitsByFloor = filteredUnits.reduce((acc, unit) => {
-      const floor = unit.unitNumber.split("-")[0];
-      if (!acc[floor]) {
-        acc[floor] = [];
-      }
-      acc[floor].push(unit);
-      return acc;
-    }, {});
-
-    // Create an array of floor numbers from 4 to 39
-    const allFloors = Array.from({ length: 36 }, (_, i) => String(i + 4)).sort(
-      (a, b) => parseInt(a) - parseInt(b)
-    );
-
-    // Use only the floors that have units in the database
-    const validFloors = allFloors.reduce((acc, floor) => {
-      if (unitsByFloor[floor]) {
-        acc[floor] = unitsByFloor[floor].sort((a, b) => {
-          const [, unitA] = a.unitNumber.split("-");
-          const [, unitB] = b.unitNumber.split("-");
-          return parseInt(unitA) - parseInt(unitB);
-        });
-      }
-      return acc;
-    }, {});
-
-    // Ensure we're showing floors in ascending order
-    const sortedFloorNumbers = Object.keys(validFloors).sort(
-      (a, b) => parseInt(a) - parseInt(b)
-    );
-
-    // Pagination for floors
-    const paginateFloors = (floors) => {
-      const startIndex = (floorPage - 1) * floorsPerPage;
-      const endIndex = startIndex + floorsPerPage;
-      return floors.slice(startIndex, endIndex);
-    };
-
-    const renderFloorPagination = (totalFloors) => {
-      const totalPages = Math.ceil(totalFloors / floorsPerPage);
-      if (totalPages <= 1) return null;
-
+  const renderOverviewView = () => {
+    // This function will render the overview with property cards showing actual availability data
       return (
-        <div className="pagination">
-          <button
-            className="pagination-button"
-            onClick={() => setFloorPage((prev) => Math.max(1, prev - 1))}
-            disabled={floorPage === 1}
-          >
-            Previous
-          </button>
-          <span className="pagination-info">
-            Page {floorPage} of {totalPages}
-          </span>
-          <button
-            className="pagination-button"
-            onClick={() =>
-              setFloorPage((prev) => Math.min(totalPages, prev + 1))
-            }
-            disabled={floorPage === totalPages}
-          >
-            Next
-          </button>
+      <div className="overview-section">
+        <div className="overview-grid">
+          <div className="property-card">
+            <img 
+              src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80" 
+              alt="TERES FASA 1" 
+              className="property-image" 
+            />
+            <div className="property-content">
+              <h3 className="property-title">TERES FASA 1</h3>
+              <p className="property-description">
+                Spacious 20' x 70' terrace houses with modern design and comfortable living spaces.
+              </p>
+              <div className="property-stats">
+                <div className="stat-row">
+                  <div className="stat-label">TOTAL UNITS:</div>
+                  <div className="stat-value">{unitStatsData["TERES FASA 1"]?.total || 0}</div>
         </div>
-      );
-    };
-
-    // Pagination for units in a floor
-    const paginateUnits = (units) => {
-      const startIndex = (currentPage - 1) * unitsPerPage;
-      const endIndex = startIndex + unitsPerPage;
-      return units.slice(startIndex, endIndex);
-    };
-
-    const renderUnitsPagination = (totalUnits) => {
-      const totalPages = Math.ceil(totalUnits / unitsPerPage);
-      if (totalPages <= 1) return null;
-
-      return (
-        <div className="pagination">
-          <button
-            className="pagination-button"
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </button>
-          <span className="pagination-info">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            className="pagination-button"
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-            }
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </button>
+                <div className="stat-row">
+                  <div className="stat-label">AVAILABLE:</div>
+                  <div className="stat-value">
+                    {unitStatsData["TERES FASA 1"]?.present || 0}
         </div>
-      );
-    };
-
-    // Update the unit card rendering to show the correct view type
-    const renderUnitCard = (unit) => {
-      const [, unitNum] = unit.unitNumber.split("-");
-      const unitNumber = parseInt(unitNum, 10);
-      const isLakeView = unitNumber >= 8 && unitNumber <= 18;
-      const viewType = isLakeView ? "Lake View" : "Facility View";
-
-      const getStatusClass = (unit) => {
-        switch (unit.status) {
-          case "booked":
-            return "booked";
-          case "reserved":
-            return "reserved";
-          case "available":
-            return "available";
-          default:
-            return unit.isAvailable ? "available" : "reserved";
-        }
-      };
-
-      const getStatusText = (unit) => {
-        switch (unit.status) {
-          case "booked":
-            return "Booked";
-          case "reserved":
-            return "Reserved";
-          case "available":
-            return "Available";
-          default:
-            return unit.isAvailable ? "Available" : "Reserved";
-        }
-      };
-
-      const isExpanded = selectedUnitId === unit._id;
-      const shouldShow = !selectedUnitId || isExpanded;
-
-      return (
-        <div
-          key={unit._id}
-          className={`unit-card ${getStatusClass(unit)} ${
-            isExpanded ? "expanded" : "minimized"
-          } ${shouldShow ? "" : "hidden"}`}
-          onClick={() => {
-            if (selectedUnitId === unit._id) {
-              setSelectedUnitId(null);
-            } else {
-              setSelectedUnitId(unit._id);
-            }
-          }}
-        >
-          <div className="unit-header">
-            <h4>Unit {unit.unitNumber}</h4>
-            <div className="unit-status">
-              <span className={`status-badge ${getStatusClass(unit)}`}>
-                {getStatusText(unit)}
-              </span>
-              <p className="view-type">{viewType}</p>
             </div>
+                <div className="stat-row">
+                  <div className="stat-label">PRICE:</div>
+                  <div className="stat-value">RM 299,000</div>
           </div>
-          <div className="unit-details">
-            <div className="detail-row">
-              <div>
-                <strong>Type</strong>
-                <p>{unit.type}</p>
               </div>
-              <div>
-                <strong>Facing</strong>
-                <p>{unit.facing}</p>
-              </div>
-            </div>
-            <div className="detail-row">
-              <div>
-                <strong>Built-up Area</strong>
-                <p>{unit.builtUpArea} sq ft</p>
-              </div>
-              <div>
-                <strong>Price</strong>
-                <p>RM {unit.spaPrice.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="detail-row">
-              <div>
-                <strong>Price per sq ft</strong>
-                <p>RM {(unit.spaPrice / unit.builtUpArea).toFixed(2)}</p>
-              </div>
-              <div>
-                <strong>Total Car Parks</strong>
-                <p>{unit.totalCarParks}</p>
-              </div>
-            </div>
-            {unit.isAvailable && (
-              <button
-                className="btn btn-primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log(
-                    "Reserve button clicked for unit:",
-                    unit.unitNumber
-                  );
-                  handleBookUnit(unit);
-                }}
-              >
-                Reserve Unit
+              <button className="property-button" onClick={() => handleManageUnits('TERES FASA 1')}>
+                MANAGE TERES FASA 1 UNITS
               </button>
-            )}
-          </div>
-        </div>
-      );
-    };
+              </div>
+            </div>
 
-    return (
-      <div className="units-section">
-        <div className="units-header">
-          <h3>{selectedView === "lake" ? "Lake View Units" : "Facility View Units"}</h3>
-          <div className="header-actions">
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSelectedView(null);
-                setSelectedFloor(null);
-                setCurrentPage(1);
-                setFloorPage(1);
-                setActiveView("overview");
-                setSelectedUnitId(null);
-              }}
-            >
-              Back to Overview
-            </button>
-            {selectedFloor && (
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setSelectedFloor(null);
-                  setFloorPage(1);
-                  setSelectedUnitId(null);
-                  setCurrentPage(1);
-                }}
-              >
-                Back to Floors
+          <div className="property-card">
+            <img 
+              src="https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80" 
+              alt="TERES FASA 2" 
+              className="property-image" 
+            />
+            <div className="property-content">
+              <h3 className="property-title">TERES FASA 2</h3>
+              <p className="property-description">
+                Premium 20' x 70' terrace houses with enhanced features and strategic location.
+              </p>
+              <div className="property-stats">
+                <div className="stat-row">
+                  <div className="stat-label">TOTAL UNITS:</div>
+                  <div className="stat-value">{unitStatsData["TERES FASA 2"]?.total || 0}</div>
+              </div>
+                <div className="stat-row">
+                  <div className="stat-label">AVAILABLE:</div>
+                  <div className="stat-value">
+                    {unitStatsData["TERES FASA 2"]?.present || 0}
+              </div>
+            </div>
+                <div className="stat-row">
+                  <div className="stat-label">PRICE:</div>
+                  <div className="stat-value">RM 309,000</div>
+              </div>
+              </div>
+              <button className="property-button" onClick={() => handleManageUnits('TERES FASA 2')}>
+                MANAGE TERES FASA 2 UNITS
               </button>
-            )}
           </div>
         </div>
 
-        {loading ? (
-          <div className="loading">Loading units...</div>
-        ) : error ? (
-          <div className="error-message">{error}</div>
-        ) : !selectedFloor ? (
-          <>
-            <div className="floors-grid">
-              {paginateFloors(sortedFloorNumbers).map((floor) => {
-                const floorUnits = validFloors[floor];
-                const availableUnits = floorUnits.filter(
-                  (unit) => unit.isAvailable
-                ).length;
-
-                return (
-                  <button
-                    key={floor}
-                    className="floor-button"
-                    onClick={() => {
-                      setSelectedFloor(floor);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <h3>Floor {floor}</h3>
-                    <div className="unit-counts">
-                      <p>{floorUnits.length} Total Units</p>
-                      <p className="available-count">
-                        {availableUnits} Available
-                      </p>
+          <div className="property-card">
+            <img 
+              src="https://images.unsplash.com/photo-1613977257363-707ba9348227?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80" 
+              alt="SEMI-D" 
+              className="property-image" 
+            />
+            <div className="property-content">
+              <h3 className="property-title">SEMI-D</h3>
+              <p className="property-description">
+                Luxurious 40' x 80' semi-detached houses with premium finishes and spacious layouts.
+              </p>
+              <div className="property-stats">
+                <div className="stat-row">
+                  <div className="stat-label">TOTAL UNITS:</div>
+                  <div className="stat-value">{unitStatsData["SEMI-D"]?.total || 0}</div>
+          </div>
+                <div className="stat-row">
+                  <div className="stat-label">AVAILABLE:</div>
+                  <div className="stat-value">
+                    {unitStatsData["SEMI-D"]?.present || 0}
+        </div>
                     </div>
+                <div className="stat-row">
+                  <div className="stat-label">PRICE:</div>
+                  <div className="stat-value">RM 499,000</div>
+                </div>
+              </div>
+              <button className="property-button" onClick={() => handleManageUnits('SEMI-D')}>
+                MANAGE SEMI-D UNITS
                   </button>
-                );
-              })}
             </div>
-            {renderFloorPagination(sortedFloorNumbers.length)}
-          </>
-        ) : (
-          <div className="floor-detail">
-            <div className="units-grid-3x4">
-              {paginateUnits(
-                validFloors[selectedFloor].sort((a, b) => {
-                  const [, unitA] = a.unitNumber.split("-");
-                  const [, unitB] = b.unitNumber.split("-");
-                  return parseInt(unitA, 10) - parseInt(unitB, 10);
-                })
-              ).map((unit) => renderUnitCard(unit))}
             </div>
-            {renderUnitsPagination(validFloors[selectedFloor].length)}
           </div>
-        )}
       </div>
     );
   };
@@ -668,8 +624,28 @@ const UserDashboard = ({ user: initialUser }) => {
   const renderProfileView = () => (
     <div className="profile-section">
       <h3>My Profile</h3>
-      <div className="profile-content">
-        {isEditingProfile ? (
+      {!isEditingProfile ? (
+        <div className="profile-info">
+          <div className="info-group">
+            <label>Name:</label>
+            <p>{profileForm.name}</p>
+          </div>
+          <div className="info-group">
+            <label>Email:</label>
+            <p>{profileForm.email}</p>
+        </div>
+          <div className="info-group">
+            <label>Phone:</label>
+            <p>{profileForm.phone || "Not set"}</p>
+          </div>
+                  <button
+            className="btn btn-primary"
+            onClick={() => setIsEditingProfile(true)}
+          >
+            Edit Profile
+                  </button>
+            </div>
+      ) : (
           <form onSubmit={handleProfileUpdate} className="profile-form">
             {updateError && (
               <div className="error-message">
@@ -749,9 +725,9 @@ const UserDashboard = ({ user: initialUser }) => {
                   setUpdateSuccess(false);
                   // Reset form to initial values
                   setProfileForm({
-                    name: initialUser.name,
-                    email: initialUser.email,
-                    phone: initialUser.phone || "",
+                    name: user?.name || "",
+                    email: user?.email || "",
+                    phone: user?.phone || "",
                     currentPassword: "",
                     newPassword: "",
                   });
@@ -761,116 +737,199 @@ const UserDashboard = ({ user: initialUser }) => {
               </button>
             </div>
           </form>
-        ) : (
-          <>
-            <div className="profile-info">
-              <div className="info-group">
-                <label>Name:</label>
-                <span>{initialUser.name}</span>
+      )}
               </div>
-              <div className="info-group">
-                <label>Email:</label>
-                <span>{initialUser.email}</span>
+  );
+
+  const renderUnitsView = () => {
+    if (!selectedView) {
+      // Show only PRESENT units across all types
+      const availableUnits = processedUnits
+        .filter(unit => unit.status === 'PRESENT')
+        .sort((a, b) => {
+          const numA = parseInt(a.unitNumber.replace(/\D/g, ''));
+          const numB = parseInt(b.unitNumber.replace(/\D/g, ''));
+          return numA - numB;
+        });
+        
+      return (
+        <div className="units-section">
+          <h3>Available Units</h3>
+          <p>{availableUnits.length} units available</p>
+          <div className="units-grid">
+            <div className="unit-row header">
+              <div className="unit-cell">Unit</div>
+              <div className="unit-cell">Type</div>
+              <div className="unit-cell">Status</div>
+              <div className="unit-cell">Specifications</div>
+              <div className="unit-cell">Action</div>
               </div>
-              <div className="info-group">
-                <label>Phone:</label>
-                <span>{initialUser.phone || "Not provided"}</span>
-              </div>
-            </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => setIsEditingProfile(true)}
-            >
-              Update Profile
-            </button>
-          </>
-        )}
+            {availableUnits.map(unit => renderUnitCard(unit))}
       </div>
     </div>
   );
+    }
+    
+    const filteredUnits = processedUnits
+      .filter((unit) => unit.type === selectedView)
+      .sort((a, b) => {
+        const numA = parseInt(a.unitNumber.replace(/\D/g, ''));
+        const numB = parseInt(b.unitNumber.replace(/\D/g, ''));
+        return numA - numB;
+      });
 
-  const BookingModal = () => {
-    if (!showBookingModal || !bookingUnit) return null;
+    const totalPages = Math.ceil(filteredUnits.length / unitsPerPage);
+    const startIndex = (currentPage - 1) * unitsPerPage;
+    const paginatedUnits = filteredUnits.slice(
+      startIndex,
+      startIndex + unitsPerPage
+    );
 
-    const handleOverlayClick = (e) => {
-      if (e.target === e.currentTarget) {
-        handleCloseModal();
-      }
-    };
+    if (loading) {
+      return <div className="loading">Loading units...</div>;
+    }
+
+    if (error) {
+      return <div className="error-message">{error}</div>;
+    }
 
     return (
-      <div className="modal-overlay" onClick={handleOverlayClick}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>Reserve Unit {bookingUnit.unitNumber}</h3>
+      <div className="units-section">
+        <div className="units-header">
+          <div className="header-content">
+            <h3>{selectedView} Units</h3>
+            <p className="units-count">
+              {filteredUnits.length} {filteredUnits.length === 1 ? 'unit' : 'units'} available
+            </p>
+          </div>
+          <div className="header-actions">
             <button
-              className="modal-close"
-              onClick={handleCloseModal}
-              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSelectedView(null);
+                setCurrentPage(1);
+                setActiveView("overview");
+                setSelectedUnitId(null);
+              }}
             >
-              &times;
+              Back to Overview
             </button>
           </div>
+          </div>
 
-          <ReservationForm
-            unit={bookingUnit}
-            onSuccess={handleBookingSubmit}
-            onClose={handleCloseModal}
-          />
+        <div className="units-grid">
+          <div className="unit-row header">
+            <div className="unit-cell">Unit</div>
+            <div className="unit-cell">Type</div>
+            <div className="unit-cell">Status</div>
+            <div className="unit-cell">Specifications</div>
+            <div className="unit-cell">Action</div>
         </div>
+          {paginatedUnits.map((unit) => renderUnitCard(unit))}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="pagination">
+            <div className="pagination-controls">
+              <button
+                className="pagination-button"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              <span className="pagination-info">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                className="pagination-button"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
+  };
+
+  const handleLogin = () => {
+    window.location.href = '/login';
+  };
+
+  // Add this function to handle unit management navigation
+  const handleManageUnits = (unitType) => {
+    setActiveView('units');
+    setSelectedView(unitType);
+  };
+
   return (
-    <div className="admin-dashboard user-dashboard">
+    <div className="user-dashboard">
       <div className="dashboard-header">
-        <h2>Welcome, {initialUser.name}</h2>
+        <h2>Property Management Dashboard</h2>
         <div className="view-navigation">
           <button
-            className={`view-button ${
-              activeView === "overview" ? "active" : ""
-            }`}
-            onClick={() => {
-              setActiveView("overview");
-              setSelectedView(null);
-            }}
+            className={`view-button ${activeView === 'units' ? 'active' : ''}`}
+            onClick={() => setActiveView('units')}
           >
-            Overview
+            Units
+          </button>
+          {isLoggedIn ? (
+            <>
+          <button
+                className={`view-button ${activeView === 'reservations' ? 'active' : ''}`}
+                onClick={() => setActiveView('reservations')}
+              >
+                Reservations
           </button>
           <button
-            className={`view-button ${
-              activeView === "profile" ? "active" : ""
-            }`}
-            onClick={() => {
-              setActiveView("profile");
-              setSelectedView(null);
-            }}
-          >
-            My Profile
+                className="view-button logout-button"
+                onClick={handleLogout}
+              >
+                Logout
           </button>
-          <button
-            className={`view-button ${
-              activeView === "reservations" ? "active" : ""
-            }`}
-            onClick={() => {
-              setActiveView("reservations");
-              setSelectedView(null);
-            }}
-          >
-            My Reservations
-          </button>
+            </>
+          ) : (
+            <button
+              className="view-button login-button"
+              onClick={handleLogin}
+            >
+              Login
+            </button>
+          )}
         </div>
       </div>
 
       <div className="dashboard-content">
-        {activeView === "overview" && renderOverviewView()}
-        {activeView === "profile" && renderProfileView()}
-        {activeView === "units" && renderUnitsView()}
-        {activeView === "reservations" && <UserReservations />}
+        {!activeView || activeView === 'overview' ? renderOverviewView() : null}
+        {activeView === 'profile' && renderProfileView()}
+        {activeView === 'units' && renderUnitsView()}
+        {activeView === 'reservations' && <UserReservations />}
       </div>
 
-      {showBookingModal && <BookingModal />}
+      {showBookingModal && isLoggedIn && (
+        <ReservationForm
+          unit={bookingUnit}
+          onClose={() => {
+            setShowBookingModal(false);
+            setBookingUnit(null);
+          }}
+          onSuccess={() => {
+            setShowBookingModal(false);
+            setBookingUnit(null);
+            setBookingSuccess(true);
+          }}
+          onError={(error) => setBookingError(error)}
+        />
+      )}
     </div>
   );
 };

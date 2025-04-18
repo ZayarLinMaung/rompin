@@ -147,13 +147,13 @@ router.put("/:id/status", auth, async (req, res) => {
 
     // Update unit status based on booking status
     if (newStatus === "cancelled" || newStatus === "rejected") {
-      unit.status = "available";
+      unit.status = "PRESENT";
       unit.isAvailable = true;
     } else if (newStatus === "booked") {
-      unit.status = "booked"; // Change unit status to booked
+      unit.status = "NEW BOOK";
       unit.isAvailable = false;
     } else if (newStatus === "pending") {
-      unit.status = "reserved";
+      unit.status = "ADVISE";
       unit.isAvailable = false;
     }
 
@@ -163,15 +163,23 @@ router.put("/:id/status", auth, async (req, res) => {
       newStatus: newStatus,
       unitId: unit._id,
       unitStatus: unit.status,
+      isAvailable: unit.isAvailable
     });
 
+    // Save both booking and unit
     await Promise.all([booking.save(), unit.save()]);
 
-    // Populate the response
-    await booking.populate(
-      "unitId",
-      "unitNumber type builtUpArea spaPrice status"
-    );
+    // Populate the response with all necessary fields
+    await booking.populate([
+      {
+        path: "unitId",
+        select: "unitNumber type builtUpArea spaPrice status isAvailable"
+      },
+      {
+        path: "userId",
+        select: "name email"
+      }
+    ]);
 
     res.json(booking);
   } catch (err) {
@@ -202,8 +210,25 @@ router.put("/:id/cancel", auth, async (req, res) => {
     booking.status = "cancelled";
     await booking.save();
 
-    // Update unit availability
-    await Unit.findByIdAndUpdate(booking.unitId, { isAvailable: true });
+    // Update unit status and availability
+    const unit = await Unit.findById(booking.unitId);
+    if (unit) {
+      unit.status = "PRESENT";
+      unit.isAvailable = true;
+      await unit.save();
+    }
+
+    // Populate the response with unit details
+    await booking.populate([
+      {
+        path: "unitId",
+        select: "unitNumber type builtUpArea spaPrice status isAvailable"
+      },
+      {
+        path: "userId",
+        select: "name email"
+      }
+    ]);
 
     res.json(booking);
   } catch (err) {

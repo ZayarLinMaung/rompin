@@ -17,7 +17,7 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.unit-card.available {
+.unit-card.present {
   border-left-color: #28a745;
 }
 
@@ -27,6 +27,14 @@
 
 .unit-card.booked {
   border-left-color: #dc3545;
+}
+
+.unit-card.new-book {
+  border-left-color: #ff0000;
+}
+
+.unit-card.advise {
+  border-left-color: #ffc107;
 }
 
 .unit-header {
@@ -50,7 +58,7 @@
   font-weight: 500;
 }
 
-.status-badge.available {
+.status-badge.present {
   background-color: #e6f4ea;
   color: #1e7e34;
 }
@@ -63,6 +71,16 @@
 .status-badge.booked {
   background-color: #dc3545;
   color: white;
+}
+
+.status-badge.new-book {
+  background-color: #ff0000;
+  color: white;
+}
+
+.status-badge.advise {
+  background-color: #fff3cd;
+  color: #856404;
 }
 
 .unit-details {

@@ -10,44 +10,56 @@ const UnitModal = ({
   isAdmin = false,
 }) => {
   const [formData, setFormData] = useState({
-    unitNumber: "",
-    type: "",
-    lotNo: "",
-    builtUpArea: "",
-    facing: "",
-    spaPrice: "",
-    totalCarParks: "",
-    status: "available",
+    specifications: {
+      unitNumber: "",
+      builtUp: "",
+      extraLand: "",
+      landSize: "",
+      bedrooms: "",
+      bathrooms: ""
+    },
+    status: "PRESENT",
   });
 
   useEffect(() => {
     if (unit) {
       setFormData({
-        unitNumber: unit.unitNumber || "",
-        type: unit.type || "",
-        lotNo: unit.lotNo || "",
-        builtUpArea: unit.builtUpArea || "",
-        facing: unit.facing || "",
-        spaPrice: unit.spaPrice || "",
-        totalCarParks: unit.totalCarParks || "",
-        status: unit.status || "available",
+        specifications: {
+          unitNumber: unit.unitNumber || "",
+          builtUp: unit.specifications?.builtUp || "20'x40'",
+          extraLand: unit.specifications?.extraLand || "8'",
+          landSize: unit.specifications?.landSize || "20'x70'",
+          bedrooms: unit.specifications?.bedrooms || 3,
+          bathrooms: unit.specifications?.bathrooms || 2
+        },
+        status: unit.status || "PRESENT",
       });
     }
   }, [unit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name.startsWith('specifications.')) {
+      const specField = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        specifications: {
+          ...prev.specifications,
+          [specField]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const updatedData = {
       ...formData,
-      status: formData.status,
       _id: unit?._id,
     };
 
@@ -74,115 +86,84 @@ const UnitModal = ({
         </button>
         <h2>{unit ? "Edit Unit" : "Add New Unit"}</h2>
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="unitNumber">Unit Number</label>
-            <input
-              type="text"
-              id="unitNumber"
-              name="unitNumber"
-              value={formData.unitNumber}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="type">Type</label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Type</option>
-              <option value="B1">B1</option>
-              <option value="B">B</option>
-              <option value="C1">C1</option>
-              <option value="C">C</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="lotNo">Lot No</label>
-            <input
-              type="text"
-              id="lotNo"
-              name="lotNo"
-              value={formData.lotNo}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="builtUpArea">Built-up Area (sq ft)</label>
-            <input
-              type="number"
-              id="builtUpArea"
-              name="builtUpArea"
-              value={formData.builtUpArea}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="facing">Facing</label>
-            <select
-              id="facing"
-              name="facing"
-              value={formData.facing}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Facing</option>
-              <option value="Lake View">Lake View</option>
-              <option value="Facility View North">Facility View North</option>
-              <option value="Facility View East">Facility View East</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="spaPrice">Price (RM)</label>
-            <input
-              type="number"
-              id="spaPrice"
-              name="spaPrice"
-              value={formData.spaPrice}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="totalCarParks">Total Car Parks</label>
-            <input
-              type="number"
-              id="totalCarParks"
-              name="totalCarParks"
-              value={formData.totalCarParks}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          {isAdmin && (
+          <div className="form-section">
+            <h4>Specifications</h4>
             <div className="form-group">
-              <label htmlFor="status">Status</label>
-              <select
-                id="status"
-                name="status"
-                value={formData.status}
+              <label>Unit Number:</label>
+              <input
+                type="text"
+                name="specifications.unitNumber"
+                value={formData.specifications?.unitNumber || ""}
                 onChange={handleChange}
                 required
-              >
-                <option value="available">Available</option>
-                <option value="reserved">Reserved</option>
-                <option value="booked">Booked</option>
-              </select>
+              />
             </div>
-          )}
+            <div className="form-group">
+              <label>Built Up:</label>
+              <input
+                type="text"
+                name="specifications.builtUp"
+                value={formData.specifications?.builtUp || "20'x40'"}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label>Extra Land:</label>
+              <input
+                type="text"
+                name="specifications.extraLand"
+                value={formData.specifications?.extraLand || "8'"}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label>Land Size:</label>
+              <input
+                type="text"
+                name="specifications.landSize"
+                value={formData.specifications?.landSize || "20'x70'"}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label>Bedrooms:</label>
+              <input
+                type="number"
+                name="specifications.bedrooms"
+                value={formData.specifications?.bedrooms || 3}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label>Bathrooms:</label>
+              <input
+                type="number"
+                name="specifications.bathrooms"
+                value={formData.specifications?.bathrooms || 2}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Status:</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+            >
+              <option value="PRESENT">Present</option>
+              <option value="ADVISE">Advise</option>
+              <option value="LA SIGNED">LA Signed</option>
+              <option value="SPA SIGNED">SPA Signed</option>
+              <option value="LOAN APPROVED">Loan Approved</option>
+              <option value="PENDING BUYER DOC">Pending Buyer Doc</option>
+              <option value="LANDOWNER UNIT">Landowner Unit</option>
+              <option value="LOAN IN PROCESS">Loan in Process</option>
+              <option value="NEW BOOK">New Book</option>
+            </select>
+          </div>
 
           <div className="modal-actions">
             <button type="submit" className="submit-btn">

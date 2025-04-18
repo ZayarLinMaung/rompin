@@ -8,7 +8,7 @@ const Booking = require("../models/Booking");
 const fs = require("fs");
 
 // Get all units with filters
-router.get("/", auth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { facing, minPrice, maxPrice, status, type, minArea, maxArea } =
       req.query;
@@ -74,7 +74,7 @@ router.get("/", auth, async (req, res) => {
 });
 
 // Get unit statistics
-router.get("/stats", auth, async (req, res) => {
+router.get("/stats", async (req, res) => {
   try {
     const stats = await Unit.aggregate([
       {
@@ -99,7 +99,7 @@ router.get("/stats", auth, async (req, res) => {
 });
 
 // Get single unit
-router.get("/:id", auth, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const unit = await Unit.findById(req.params.id);
     if (!unit) {
@@ -146,7 +146,7 @@ router.put("/:id", auth, async (req, res) => {
         $set: {
           ...req.body,
           status: req.body.status, // Ensure status is explicitly set
-          isAvailable: req.body.status === "available",
+          isAvailable: req.body.status === "PRESENT",
         },
       },
       { new: true }
@@ -191,8 +191,8 @@ router.delete("/:id", auth, async (req, res) => {
   }
 });
 
-// Reserve unit (user)
-router.put("/:id/reserve", auth, async (req, res) => {
+// Reserve unit (POST method)
+router.post("/:id/reserve", auth, async (req, res) => {
   try {
     const unit = await Unit.findById(req.params.id);
     if (!unit) {
@@ -200,7 +200,7 @@ router.put("/:id/reserve", auth, async (req, res) => {
     }
 
     // Check if unit is available
-    if (unit.status !== "available" && req.user.role !== "admin") {
+    if (unit.status !== "PRESENT" && req.user.role !== "admin") {
       return res.status(400).json({
         message: `Unit is not available for reservation (Status: ${unit.status})`,
       });
@@ -216,17 +216,20 @@ router.put("/:id/reserve", auth, async (req, res) => {
       ic: req.body.ic,
       contact: req.body.contact,
       address: req.body.address,
-      status: "pending",
+      status: "pending", // Set initial booking status to pending
     });
 
     await booking.save();
 
-    // Update unit status to reserved
-    unit.status = "reserved";
+    // Update unit status to ADVISE and mark as not available
+    unit.status = "ADVISE";
     unit.isAvailable = false;
     await unit.save();
 
-    res.json({ booking, unit });
+    // Return both booking and unit data
+    const populatedBooking = await booking.populate("unitId");
+    
+    res.json({ booking: populatedBooking, unit });
   } catch (err) {
     console.error("Error creating booking:", err);
     if (err.name === "ValidationError") {
@@ -306,5 +309,74 @@ router.post(
     }
   }
 );
+
+// Get all unit types with specifications and availability
+router.get('/types', async (req, res) => {
+  try {
+    const unitTypes = await Unit.aggregate([
+      {
+        $group: {
+          _id: '$phase',
+          specifications: { $first: '$specifications' },
+          totalUnits: { $sum: 1 },
+          availableUnits: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'PRESENT'] }, 1, 0]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          phase: '$_id',
+          specifications: 1,
+          totalUnits: 1,
+          availableUnits: 1
+        }
+      },
+      {
+        $sort: { phase: 1 }
+      }
+    ]);
+
+    res.json(unitTypes);
+  } catch (error) {
+    console.error('Error fetching unit types:', error);
+    res.status(500).json({ message: 'Error fetching unit types' });
+  }
+});
+
+// Get units by phase
+router.get('/phase/:phase', async (req, res) => {
+  try {
+    const units = await Unit.find({ phase: req.params.phase }).sort({ unitNumber: 1 });
+    res.json(units);
+  } catch (error) {
+    console.error('Error fetching units by phase:', error);
+    res.status(500).json({ message: 'Error fetching units by phase' });
+  }
+});
+
+// Update unit status
+router.patch('/:unitNumber/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const unit = await Unit.findOneAndUpdate(
+      { unitNumber: req.params.unitNumber },
+      { status },
+      { new: true }
+    );
+    
+    if (!unit) {
+      return res.status(404).json({ message: 'Unit not found' });
+    }
+    
+    res.json(unit);
+  } catch (error) {
+    console.error('Error updating unit status:', error);
+    res.status(500).json({ message: 'Error updating unit status' });
+  }
+});
 
 module.exports = router;

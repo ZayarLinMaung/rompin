@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import "./ReservationForm.css";
 
@@ -27,7 +27,7 @@ const ReservationForm = ({ unit, onClose, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    console.log("ReservationForm rendered with props:", { unit });
+    console.log("ReservationForm rendered with unit:", unit);
   }, [unit]);
 
   const handleInputChange = useCallback(
@@ -93,7 +93,7 @@ const ReservationForm = ({ unit, onClose, onSuccess }) => {
 
   const handleSubmit = useCallback(
     async (e) => {
-      e.preventDefault(); // Prevents the form from reloading the page
+      e.preventDefault();
       if (!validateForm()) return;
 
       setIsSubmitting(true);
@@ -107,44 +107,62 @@ const ReservationForm = ({ unit, onClose, onSuccess }) => {
 
       try {
         const reservationData = {
-          unitId: unit._id,
-          userId: JSON.parse(atob(token.split(".")[1])).id,
-          ...formData,
-          status: "pending", // Set initial status to pending
+          agencyName: formData.agencyName,
+          agentName: formData.agentName,
+          name: formData.name,
+          ic: formData.ic,
+          contact: formData.contact,
+          address: formData.address
         };
 
+        console.log('Submitting reservation with data:', reservationData);
+
         // Create the reservation
-        const reservationResponse = await axios.put(
+        const reservationResponse = await axios.post(
           `http://localhost:5000/api/units/${unit._id}/reserve`,
           reservationData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        // Handle file uploads if present
-        const formDataWithFiles = new FormData();
-        if (files.icSoftcopy)
-          formDataWithFiles.append("icSoftcopy", files.icSoftcopy);
-        if (files.proofOfPayment)
-          formDataWithFiles.append("proofOfPayment", files.proofOfPayment);
-
-        await axios.post(
-          `http://localhost:5000/api/units/${unit._id}/files`,
-          formDataWithFiles,
-          {
-            headers: {
+          { 
+            headers: { 
               Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
+              'Content-Type': 'application/json'
+            } 
           }
         );
 
+        console.log('Reservation response:', reservationResponse.data);
+
+        // Handle file uploads if present
+        if (files.icSoftcopy || files.proofOfPayment) {
+          const formDataWithFiles = new FormData();
+          if (files.icSoftcopy)
+            formDataWithFiles.append("icSoftcopy", files.icSoftcopy);
+          if (files.proofOfPayment)
+            formDataWithFiles.append("proofOfPayment", files.proofOfPayment);
+
+          console.log('Uploading files...');
+          
+          // Use the booking ID from the reservation response for file upload
+          const bookingId = reservationResponse.data.booking._id;
+          await axios.post(
+            `http://localhost:5000/api/bookings/${bookingId}/files`,
+            formDataWithFiles,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+        }
+
+        console.log('Reservation completed successfully');
         onSuccess(reservationResponse.data);
         onClose();
       } catch (err) {
         console.error("Error submitting reservation:", err);
         setErrors({
           submit:
-            err.response?.data?.message || "Failed to submit reservation.",
+            err.response?.data?.message || "Failed to submit reservation. Please try again.",
         });
       } finally {
         setIsSubmitting(false);
@@ -153,132 +171,183 @@ const ReservationForm = ({ unit, onClose, onSuccess }) => {
     [validateForm, formData, files, unit, onClose, onSuccess]
   );
 
+  // Handle clicking outside the modal to close
+  const handleOverlayClick = (e) => {
+    if (e.target.className === 'modal-overlay') {
+      onClose();
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="reservation-form">
-      <div className="form-section">
-        <h4>Agency Information</h4>
-        <div className="form-group">
-          <label>Agency Name:</label>
-          <input
-            type="text"
-            name="agencyName"
-            value={formData.agencyName}
-            onChange={handleInputChange}
-            className={errors.agencyName ? "error" : ""}
-          />
-          {errors.agencyName && (
-            <span className="error-text">{errors.agencyName}</span>
-          )}
+    <div className="modal-overlay" onClick={handleOverlayClick}>
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2>Book Unit {unit.unitNumber}</h2>
+          <button className="close-button" onClick={onClose}>&times;</button>
         </div>
-        <div className="form-group">
-          <label>Agent Name:</label>
-          <input
-            type="text"
-            name="agentName"
-            value={formData.agentName}
-            onChange={handleInputChange}
-            className={errors.agentName ? "error" : ""}
-          />
-          {errors.agentName && (
-            <span className="error-text">{errors.agentName}</span>
-          )}
-        </div>
-      </div>
+        
+        <form onSubmit={handleSubmit} className="booking-form">
+          <div className="form-section">
+            <h3 className="form-section-title">Unit Details</h3>
+            <div className="form-row">
+              <label>Unit Number</label>
+              <p>{unit.unitNumber}</p>
+              <label>Type</label>
+              <p>{unit.type}</p>
+              <label>Status</label>
+              <p>{unit.status}</p>
+            </div>
+          </div>
 
-      <div className="form-section">
-        <h4>Customer Information</h4>
-        <div className="form-group">
-          <label>Name:</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            className={errors.name ? "error" : ""}
-          />
-          {errors.name && <span className="error-text">{errors.name}</span>}
-        </div>
-        <div className="form-group">
-          <label>IC Number:</label>
-          <input
-            type="text"
-            name="ic"
-            value={formData.ic}
-            onChange={handleInputChange}
-            className={errors.ic ? "error" : ""}
-          />
-          {errors.ic && <span className="error-text">{errors.ic}</span>}
-        </div>
-        <div className="form-group">
-          <label>Contact Number:</label>
-          <input
-            type="text"
-            name="contact"
-            value={formData.contact}
-            onChange={handleInputChange}
-            className={errors.contact ? "error" : ""}
-          />
-          {errors.contact && (
-            <span className="error-text">{errors.contact}</span>
-          )}
-        </div>
-        <div className="form-group">
-          <label>Address:</label>
-          <textarea
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            className={errors.address ? "error" : ""}
-          />
-          {errors.address && (
-            <span className="error-text">{errors.address}</span>
-          )}
-        </div>
-      </div>
+          <div className="form-section">
+            <h3 className="form-section-title">Agency Information</h3>
+            <div className="form-row">
+              <label htmlFor="agencyName">Agency Name</label>
+              <input
+                type="text"
+                id="agencyName"
+                name="agencyName"
+                value={formData.agencyName}
+                onChange={handleInputChange}
+                className={errors.agencyName ? "error" : ""}
+              />
+              {errors.agencyName && (
+                <span className="error-message">{errors.agencyName}</span>
+              )}
+            </div>
 
-      <div className="form-section">
-        <h4>Required Documents</h4>
-        <div className="form-group">
-          <label>IC Softcopy:</label>
-          <input
-            type="file"
-            name="icSoftcopy"
-            onChange={handleFileChange}
-            accept="image/*,.pdf"
-            className={errors.icSoftcopy ? "error" : ""}
-          />
-          {errors.icSoftcopy && (
-            <span className="error-text">{errors.icSoftcopy}</span>
-          )}
-        </div>
-        <div className="form-group">
-          <label>Proof of Payment:</label>
-          <input
-            type="file"
-            name="proofOfPayment"
-            onChange={handleFileChange}
-            accept="image/*,.pdf"
-            className={errors.proofOfPayment ? "error" : ""}
-          />
-          {errors.proofOfPayment && (
-            <span className="error-text">{errors.proofOfPayment}</span>
-          )}
-        </div>
-      </div>
+            <div className="form-row">
+              <label htmlFor="agentName">Agent Name</label>
+              <input
+                type="text"
+                id="agentName"
+                name="agentName"
+                value={formData.agentName}
+                onChange={handleInputChange}
+                className={errors.agentName ? "error" : ""}
+              />
+              {errors.agentName && (
+                <span className="error-message">{errors.agentName}</span>
+              )}
+            </div>
+          </div>
 
-      {errors.submit && <div className="error-message">{errors.submit}</div>}
+          <div className="form-section">
+            <h3 className="form-section-title">Personal Information</h3>
+            <div className="form-row">
+              <label htmlFor="name">Full Name</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className={errors.name ? "error" : ""}
+              />
+              {errors.name && <span className="error-message">{errors.name}</span>}
+            </div>
 
-      <div className="form-actions">
-        <button type="button" onClick={onClose} disabled={isSubmitting}>
-          Cancel
-        </button>
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Submitting..." : "Submit Reservation"}
-        </button>
+            <div className="form-row">
+              <label htmlFor="ic">IC Number</label>
+              <input
+                type="text"
+                id="ic"
+                name="ic"
+                value={formData.ic}
+                onChange={handleInputChange}
+                className={errors.ic ? "error" : ""}
+              />
+              {errors.ic && <span className="error-message">{errors.ic}</span>}
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="contact">Contact Number</label>
+              <input
+                type="tel"
+                id="contact"
+                name="contact"
+                value={formData.contact}
+                onChange={handleInputChange}
+                className={errors.contact ? "error" : ""}
+              />
+              {errors.contact && (
+                <span className="error-message">{errors.contact}</span>
+              )}
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="address">Address</label>
+              <textarea
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                className={errors.address ? "error" : ""}
+              />
+              {errors.address && (
+                <span className="error-message">{errors.address}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h3 className="form-section-title">Required Documents</h3>
+            <div className="form-row">
+              <label htmlFor="icSoftcopy">IC Softcopy</label>
+              <input
+                type="file"
+                id="icSoftcopy"
+                name="icSoftcopy"
+                onChange={handleFileChange}
+                accept="image/*,.pdf"
+              />
+              {errors.icSoftcopy && (
+                <span className="error-message">{errors.icSoftcopy}</span>
+              )}
+              <span className="helper-text">Upload a clear copy of your IC (PDF or image)</span>
+            </div>
+
+            <div className="form-row">
+              <label htmlFor="proofOfPayment">Proof of Payment</label>
+              <input
+                type="file"
+                id="proofOfPayment"
+                name="proofOfPayment"
+                onChange={handleFileChange}
+                accept="image/*,.pdf"
+              />
+              {errors.proofOfPayment && (
+                <span className="error-message">{errors.proofOfPayment}</span>
+              )}
+              <span className="helper-text">Upload your payment receipt (PDF or image)</span>
+            </div>
+          </div>
+
+          {errors.submit && (
+            <div className="submit-error">{errors.submit}</div>
+          )}
+
+          <div className="modal-footer">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Booking"}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 };
 
-// Export with memo and custom comparison function
 export default React.memo(ReservationForm, areEqual);

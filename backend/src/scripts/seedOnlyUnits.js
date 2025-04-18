@@ -101,7 +101,7 @@ async function seedUnits() {
           pricePerSqFt: unit.pricePerSqFt,
           totalCarParks: unit.totalCarParks,
           isAvailable: unit.isAvailable,
-          status: unit.isAvailable ? 'available' : 'sold'
+          status: unit.isAvailable ? 'PRESENT' : 'ADVISE'
         };
         
         try {

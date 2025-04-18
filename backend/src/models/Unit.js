@@ -6,51 +6,33 @@ const unitSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  lotNo: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  builtUpArea: {
-    type: Number,
-    required: true,
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: ["B1", "B", "C1", "C"],
-  },
-  facing: {
-    type: String,
-    required: true,
-    enum: [
-      "Lake View",
-      "Facility View North",
-      "Facility View East",
-      "Facility View South",
-      "Facility View West",
-    ],
-  },
-  spaPrice: {
-    type: Number,
-    required: true,
-  },
-  pricePerSqFt: {
-    type: Number,
-    required: true,
-  },
-  totalCarParks: {
-    type: Number,
-    required: true,
-  },
-  isAvailable: {
-    type: Boolean,
-    default: true,
+  specifications: {
+    builtUp: {
+      type: String,
+      default: "20'x40'"
+    },
+    extraLand: {
+      type: String,
+      default: "8'"
+    },
+    landSize: {
+      type: String,
+      default: "20'x70'"
+    },
+    bedrooms: {
+      type: Number,
+      default: 3
+    },
+    bathrooms: {
+      type: Number,
+      default: 2
+    }
   },
   status: {
     type: String,
-    enum: ["available", "reserved", "booked", "sold", "pending"],
-    default: "available",
+    enum: ["PRESENT", "ADVISE", "LA SIGNED", "SPA SIGNED", "LOAN APPROVED", 
+           "PENDING BUYER DOC", "LANDOWNER UNIT", "NEW BOOK", "LOAN IN PROCESS"],
+    default: "PRESENT"
   },
   createdAt: {
     type: Date,
@@ -59,7 +41,7 @@ const unitSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now,
-  },
+  }
 });
 
 // Update the updatedAt timestamp before saving

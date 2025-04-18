@@ -17,92 +17,96 @@ const AdminDashboard = () => {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedUnit, setSelectedUnit] = useState(null);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingUnit, setBookingUnit] = useState(null);
   const [activeView, setActiveView] = useState("units");
-  const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [selectedFacing, setSelectedFacing] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [floorPage, setFloorPage] = useState(1);
-  const [sortBy, setSortBy] = useState("type"); // Default sort by type
-  const [filters, setFilters] = useState({
-    facing: "",
-    minPrice: "",
-    maxPrice: "",
-    isAvailable: "",
-    type: "",
-    minArea: "",
-    maxArea: "",
-  });
-  const [selectedFloor, setSelectedFloor] = useState(null);
-  const [currentFloorPage, setCurrentFloorPage] = useState(1);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
-  const UNITS_PER_PAGE = 12; // 2x6 grid
+  const UNITS_PER_PAGE = 12;
+
+  useEffect(() => {
+    fetchUnits();
+  }, []);
 
   const fetchUnits = async () => {
+    try {
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("token");
 
-    try {
-      let url = "http://localhost:5000/api/units";
-      if (selectedFacing) {
-        const facing =
-          selectedFacing === "Facility View"
-            ? "facing[$regex]=^Facility View"
-            : `facing=${selectedFacing}`;
-        url += `?${facing}`;
+      if (!token) {
+        throw new Error("No authentication token found. Please log in again.");
       }
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch("http://localhost:5000/api/units", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-
-      // Filter units by floor on the frontend
-      let filteredUnits = response.data.units;
-      if (selectedFloor) {
-        filteredUnits = filteredUnits.filter((unit) => {
-          const floorNumber = parseInt(unit.unitNumber.split("-")[0]);
-          return floorNumber === selectedFloor;
-        });
+      
+      if (response.status === 401) {
+        // Token expired or invalid
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return;
       }
-
-      setUnits(filteredUnits);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch units");
+      }
+      
+      const data = await response.json();
+      console.log("Full API Response:", data);
+      console.log("Units from API:", data.units);
+      console.log("Sample unit:", data.units?.[0]);
+      
+      // Extract units array from response
+      const unitsData = data.units || [];
+      setUnits(unitsData);
+      setLoading(false);
     } catch (err) {
       console.error("Error fetching units:", err);
-      setError(err.response?.data?.message || "Error fetching units");
-    } finally {
+      setError(err.message);
+      setUnits([]);
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchUnits();
-  }, [selectedFacing, selectedFloor]);
-
   const handleViewSelect = (facing) => {
-    setSelectedFacing(facing === selectedFacing ? null : facing);
+    const newFacing = facing === selectedFacing ? null : facing;
+    setSelectedFacing(newFacing);
+    setCurrentPage(1); // Reset pagination when changing view
   };
 
   const handleUnitClick = (unit) => {
-    setSelectedUnitId(unit._id);
+    setSelectedUnit(unit);
     setShowUnitModal(true);
   };
 
   const handleBookingClick = (unit) => {
-    setBookingUnit(unit);
+    setSelectedUnit(unit);
     setShowBookingModal(true);
   };
 
   const handleViewChange = (view) => {
     setActiveView(view);
-    setSelectedUnitId(null);
+    setSelectedUnit(null);
     setSelectedFacing(null);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+  };
+
   const handleAddUnit = () => {
-    setSelectedUnitId(null);
+    setSelectedUnit(null);
     setShowUnitModal(true);
   };
 
@@ -129,7 +133,7 @@ const AdminDashboard = () => {
       console.log("Update response:", response.data);
 
       setShowUnitModal(false);
-      setSelectedUnitId(null);
+      setSelectedUnit(null);
       await fetchUnits();
       alert("Unit updated successfully!");
     } catch (err) {
@@ -153,7 +157,7 @@ const AdminDashboard = () => {
       });
 
       setShowUnitModal(false);
-      setSelectedUnitId(null);
+      setSelectedUnit(null);
       await fetchUnits();
       alert("Unit deleted successfully!");
     } catch (err) {
@@ -196,7 +200,7 @@ const AdminDashboard = () => {
 
       // Prepare the booking data with all required fields
       const bookingData = {
-        unitId: bookingUnit._id,
+        unitId: selectedUnit._id,
         userId: userId,
         status: "reserved",
         agencyName: formData.agencyName || "",
@@ -211,7 +215,7 @@ const AdminDashboard = () => {
 
       // Reserve unit using the new reserve endpoint
       const response = await axios.put(
-        `http://localhost:5000/api/units/${bookingUnit._id}/reserve`,
+        `http://localhost:5000/api/units/${selectedUnit._id}/reserve`,
         bookingData,
         {
           headers: {
@@ -235,7 +239,7 @@ const AdminDashboard = () => {
 
         // Upload files
         const fileResponse = await axios.post(
-          `http://localhost:5000/api/units/${bookingUnit._id}/files`,
+          `http://localhost:5000/api/units/${selectedUnit._id}/files`,
           fileData,
           {
             headers: {
@@ -250,7 +254,7 @@ const AdminDashboard = () => {
 
       // Close modal and refresh data
       setShowBookingModal(false);
-      setBookingUnit(null);
+      setSelectedUnit(null);
       await fetchUnits();
 
       // Show success message
@@ -258,10 +262,8 @@ const AdminDashboard = () => {
 
       // Switch to reservations view
       setActiveView("reservations");
-      setSelectedUnitId(null);
       setSelectedFacing(null);
       setCurrentPage(1);
-      setFloorPage(1);
     } catch (err) {
       console.error("Booking error:", err);
       const errorMessage =
@@ -276,87 +278,126 @@ const AdminDashboard = () => {
     setCurrentPage(page);
   };
 
-  const handleFloorPageChange = (newPage) => {
-    setCurrentFloorPage(newPage);
-  };
+  const getUnitsForType = () => {
+    if (!selectedFacing || !Array.isArray(units)) return [];
 
-  const handleFloorSelect = (floor) => {
-    setSelectedFloor(floor);
-  };
+    console.log("Current units:", units);
+    console.log("Selected type:", selectedFacing);
 
-  const getFloorNumbers = () => {
-    return Array.from({ length: 36 }, (_, i) => i + 4).sort((a, b) => a - b);
-  };
+    const filteredUnits = units.filter((unit) => {
+      console.log("Checking unit:", unit);
+      if (!unit || typeof unit !== 'object') {
+        console.log("Invalid unit object");
+        return false;
+      }
+      const matches = unit.phase === selectedFacing;
+      console.log("Unit phase match:", matches, unit.phase);
+      return matches;
+    });
 
-  const getCurrentPageFloors = () => {
-    const floors = getFloorNumbers();
-    // Check if we're on mobile using window width
-    const isMobile = window.innerWidth <= 768;
-    const itemsPerPage = isMobile ? 6 : 18; // Use 6 for mobile, 18 for desktop
-    const startIndex = (currentFloorPage - 1) * itemsPerPage;
-    return floors.slice(startIndex, startIndex + itemsPerPage);
-  };
+    console.log("Filtered units:", filteredUnits);
 
-  const getTotalFloorPages = () => {
-    const isMobile = window.innerWidth <= 768;
-    const itemsPerPage = isMobile ? 6 : 18;
-    return Math.ceil((39 - 4 + 1) / itemsPerPage);
-  };
-
-  // Add window resize listener
-  useEffect(() => {
-    const handleResize = () => {
-      // Force re-render when window is resized to update pagination
-      setCurrentFloorPage(1);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const getUnitsForFloor = () => {
-    if (!selectedFloor || !selectedFacing) return [];
-
-    return units
-      .filter((unit) => {
-        const floorNumber = parseInt(unit.unitNumber.split("-")[0]);
-        const floorMatch = floorNumber === selectedFloor;
-        const facingMatch =
-          selectedFacing === "Facility View"
-            ? unit.facing.startsWith("Facility View")
-            : unit.facing === selectedFacing;
-        return floorMatch && facingMatch;
-      })
-      .sort((a, b) => {
-        const aNum = parseInt(a.unitNumber.split("-")[1]);
-        const bNum = parseInt(b.unitNumber.split("-")[1]);
+    return filteredUnits.sort((a, b) => {
+      if (!a || !b) return 0;
+      const aNum = parseInt(a.unitNumber?.replace(/[^0-9]/g, '') || '0');
+      const bNum = parseInt(b.unitNumber?.replace(/[^0-9]/g, '') || '0');
         return aNum - bNum;
       });
   };
 
-  const getUnitStats = (facing) => {
-    const facingUnits = units.filter((unit) => {
-      if (facing === "Facility View") {
-        return unit.facing.startsWith("Facility View");
-      }
-      return unit.facing === facing;
+  const getUnitStats = (type) => {
+    if (!Array.isArray(units)) {
+      console.warn("Units is not an array:", units);
+      return { total: 0, available: 0 };
+    }
+
+    const typeUnits = units.filter((unit) => {
+      if (!unit || typeof unit !== 'object') return false;
+      return unit.phase === type;
     });
 
     return {
-      total: facingUnits.length,
-      available: facingUnits.filter((u) => u.status === "available").length,
+      total: typeUnits.length,
+      available: typeUnits.filter((u) => u && u.status === "PRESENT").length,
     };
   };
 
   const getPagedUnits = () => {
-    const allUnits = getUnitsForFloor();
+    const allUnits = getUnitsForType();
     const startIndex = (currentPage - 1) * UNITS_PER_PAGE;
-    return allUnits.slice(startIndex, startIndex + UNITS_PER_PAGE);
+    const pagedUnits = allUnits.slice(startIndex, startIndex + UNITS_PER_PAGE);
+    console.log('Paged units:', pagedUnits); // Debug log
+    return pagedUnits;
   };
 
   const getTotalPages = () => {
-    const totalUnits = getUnitsForFloor().length;
+    const totalUnits = getUnitsForType().length;
+    console.log('Total units:', totalUnits); // Debug log
     return Math.ceil(totalUnits / UNITS_PER_PAGE);
+  };
+
+  const renderPagination = (totalItems, itemsPerPage, currentPage, setCurrentPage) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    // Calculate which page numbers to show (show max 5 pages)
+    let pageNumbers = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      // If we have 5 or fewer pages, show all of them
+      pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      // Otherwise show a window of pages around the current page
+      const leftSide = Math.floor(maxVisiblePages / 2);
+      const rightSide = maxVisiblePages - leftSide - 1;
+      
+      if (currentPage <= leftSide + 1) {
+        // Near the start
+        pageNumbers = Array.from({ length: maxVisiblePages }, (_, i) => i + 1);
+      } else if (currentPage >= totalPages - rightSide) {
+        // Near the end
+        pageNumbers = Array.from({ length: maxVisiblePages }, (_, i) => totalPages - maxVisiblePages + i + 1);
+      } else {
+        // In the middle
+        pageNumbers = Array.from({ length: maxVisiblePages }, (_, i) => currentPage - leftSide + i);
+      }
+    }
+
+    return (
+      <div className="pagination">
+        <div className="pagination-info">
+          Showing {itemsPerPage * (currentPage - 1) + 1} to {Math.min(itemsPerPage * currentPage, totalItems)} of {totalItems} items
+        </div>
+        <div className="pagination-controls">
+          <button
+            className="pagination-button"
+            onClick={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            ←
+          </button>
+          
+          {pageNumbers.map(number => (
+            <button
+              key={number}
+              className={`pagination-button ${currentPage === number ? 'active' : ''}`}
+              onClick={() => setCurrentPage(number)}
+            >
+              {number}
+            </button>
+          ))}
+          
+          <button
+            className="pagination-button"
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            →
+          </button>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -394,6 +435,12 @@ const AdminDashboard = () => {
           >
             Reservations
           </button>
+          <button
+            className="logout-btn"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
         </div>
       </div>
 
@@ -402,129 +449,141 @@ const AdminDashboard = () => {
           <div className="view-overview">
             <div
               className="view-card"
-              onClick={() => handleViewSelect("Lake View")}
+              onClick={() => handleViewSelect("TERES FASA 1")}
             >
               <img
-                src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1973&q=80"
-                alt="Lake View Units"
+                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3"
+                alt="TERES FASA 1"
                 className="view-image"
               />
               <div className="view-content">
-                <h3>Lake View</h3>
+                <h3>TERES FASA 1</h3>
                 <p>
-                  Experience the serene beauty of our lake-facing units with
-                  stunning waterfront views.
+                  Spacious 20' x 70' terrace houses with modern design and comfortable living spaces.
                 </p>
                 <div className="view-stats">
                   <div className="stat">
                     <span className="stat-label">Total Units:</span>
                     <span className="stat-value">
-                      {getUnitStats("Lake View").total}
+                      {getUnitStats("TERES FASA 1").total}
                     </span>
                   </div>
                   <div className="stat">
                     <span className="stat-label">Available:</span>
                     <span className="stat-value">
-                      {getUnitStats("Lake View").available}
+                      {getUnitStats("TERES FASA 1").available}
                     </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Price:</span>
+                    <span className="stat-value">RM 299,000</span>
                   </div>
                 </div>
                 <button
                   className={`view-button ${
-                    selectedFacing === "Lake View" ? "active" : ""
+                    selectedFacing === "TERES FASA 1" ? "active" : ""
                   }`}
                 >
-                  MANAGE LAKE VIEW UNITS
+                  MANAGE TERES FASA 1 UNITS
                 </button>
               </div>
             </div>
 
             <div
               className="view-card"
-              onClick={() => handleViewSelect("Facility View")}
+              onClick={() => handleViewSelect("TERES FASA 2")}
             >
               <img
-                src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1973&q=80"
-                alt="Facility View Units"
+                src="https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?ixlib=rb-4.0.3"
+                alt="TERES FASA 2"
                 className="view-image"
               />
               <div className="view-content">
-                <h3>Facility View</h3>
+                <h3>TERES FASA 2</h3>
                 <p>
-                  Enjoy convenient access to our world-class facilities and
-                  amenities.
+                  Premium 20' x 70' terrace houses with enhanced features and strategic location.
                 </p>
                 <div className="view-stats">
                   <div className="stat">
                     <span className="stat-label">Total Units:</span>
                     <span className="stat-value">
-                      {getUnitStats("Facility View").total}
+                      {getUnitStats("TERES FASA 2").total}
                     </span>
                   </div>
                   <div className="stat">
                     <span className="stat-label">Available:</span>
                     <span className="stat-value">
-                      {getUnitStats("Facility View").available}
+                      {getUnitStats("TERES FASA 2").available}
                     </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Price:</span>
+                    <span className="stat-value">RM 309,000</span>
                   </div>
                 </div>
                 <button
                   className={`view-button ${
-                    selectedFacing === "Facility View" ? "active" : ""
+                    selectedFacing === "TERES FASA 2" ? "active" : ""
                   }`}
                 >
-                  MANAGE FACILITY VIEW UNITS
+                  MANAGE TERES FASA 2 UNITS
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="view-card"
+              onClick={() => handleViewSelect("SEMI-D")}
+            >
+              <img
+                src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?ixlib=rb-4.0.3"
+                alt="SEMI-D Units"
+                className="view-image"
+              />
+              <div className="view-content">
+                <h3>SEMI-D</h3>
+                <p>
+                  Luxurious 40' x 80' semi-detached houses with premium finishes and spacious layouts.
+                </p>
+                <div className="view-stats">
+                  <div className="stat">
+                    <span className="stat-label">Total Units:</span>
+                    <span className="stat-value">
+                      {getUnitStats("SEMI-D").total}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Available:</span>
+                    <span className="stat-value">
+                      {getUnitStats("SEMI-D").available}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Price:</span>
+                    <span className="stat-value">RM 499,000</span>
+                  </div>
+                </div>
+                <button
+                  className={`view-button ${
+                    selectedFacing === "SEMI-D" ? "active" : ""
+                  }`}
+                >
+                  MANAGE SEMI-D UNITS
                 </button>
               </div>
             </div>
           </div>
 
           {selectedFacing && (
-            <div className="floor-selection">
-              {!selectedFloor ? (
-                <>
-                  <h3>Select Floor</h3>
-                  <div className="floor-grid">
-                    {getCurrentPageFloors().map((floor) => (
-                      <button
-                        key={floor}
-                        className="floor-button"
-                        onClick={() => handleFloorSelect(floor)}
-                      >
-                        {floor}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="pagination">
-                    {Array.from(
-                      { length: getTotalFloorPages() },
-                      (_, i) => i + 1
-                    ).map((page) => (
-                      <button
-                        key={page}
-                        className={`page-button ${
-                          currentFloorPage === page ? "active" : ""
-                        }`}
-                        onClick={() => handleFloorPageChange(page)}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="floor-units">
-                  <div className="floor-header">
+            <div className="units-section">
+              <div className="units-header">
                     <div className="header-left">
-                      <h3>Floor {selectedFloor} Units</h3>
+                  <h3>{selectedFacing} Units</h3>
+                  <span className="unit-count">
+                    {getUnitStats(selectedFacing).available} units available out of {getUnitsForType().length} total
+                  </span>
                     </div>
                     <div className="header-right">
-                      <button
-                        className="back-button"
-                        onClick={() => setSelectedFloor(null)}
-                      >
-                        ← Back to Floors
-                      </button>
                       <button className="add-unit-btn" onClick={handleAddUnit}>
                         Add New Unit
                       </button>
@@ -539,30 +598,32 @@ const AdminDashboard = () => {
                       >
                         <div className="unit-header">
                           <h4>Unit {unit.unitNumber}</h4>
-                          <span className={`unit-status ${unit.status}`}>
+                          <span className={`unit-status status-${unit.status.toLowerCase().replace(/\s+/g, '-')}`}>
                             {unit.status}
                           </span>
                         </div>
                         <div className="unit-details">
                           <div className="detail-row">
                             <span className="label">Type:</span>
-                            <span className="value">{unit.type}</span>
+                            <span className="value">{unit.phase}</span>
                           </div>
                           <div className="detail-row">
                             <span className="label">Area:</span>
                             <span className="value">
-                              {unit.builtUpArea} sq ft
+                              {unit.specifications?.builtUp || unit.builtUpArea || '-'} sq ft
                             </span>
                           </div>
                           <div className="detail-row">
                             <span className="label">Price:</span>
                             <span className="value">
-                              RM {unit.spaPrice.toLocaleString()}
+                              RM {(unit.specifications?.price || unit.spaPrice || 0).toLocaleString()}
                             </span>
                           </div>
                           <div className="detail-row">
-                            <span className="label">Facing:</span>
-                            <span className="value">{unit.facing}</span>
+                            <span className="label">Status:</span>
+                            <span className={`value status-value status-${unit.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {unit.status}
+                            </span>
                           </div>
                         </div>
                         <div className="unit-actions">
@@ -575,7 +636,7 @@ const AdminDashboard = () => {
                           >
                             Edit
                           </button>
-                          {unit.status === "available" && (
+                          {unit.status === "PRESENT" && (
                             <button
                               className="book-btn"
                               onClick={(e) => {
@@ -590,26 +651,7 @@ const AdminDashboard = () => {
                       </div>
                     ))}
                   </div>
-                  {getTotalPages() > 1 && (
-                    <div className="pagination">
-                      {Array.from(
-                        { length: getTotalPages() },
-                        (_, i) => i + 1
-                      ).map((page) => (
-                        <button
-                          key={page}
-                          className={`page-button ${
-                            currentPage === page ? "active" : ""
-                          }`}
-                          onClick={() => handlePageChange(page)}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                  {renderPagination(getUnitsForType().length, UNITS_PER_PAGE, currentPage, handlePageChange)}
             </div>
           )}
         </>
@@ -619,10 +661,10 @@ const AdminDashboard = () => {
 
       {showUnitModal && (
         <UnitModal
-          unit={units.find((u) => u._id === selectedUnitId)}
+          unit={units.find((u) => u._id === selectedUnit?._id)}
           onClose={() => {
             setShowUnitModal(false);
-            setSelectedUnitId(null);
+            setSelectedUnit(null);
           }}
           onUpdate={handleUnitUpdate}
           onDelete={handleUnitDelete}
@@ -638,18 +680,18 @@ const AdminDashboard = () => {
               className="close-button"
               onClick={() => {
                 setShowBookingModal(false);
-                setBookingUnit(null);
+                setSelectedUnit(null);
               }}
             >
               ×
             </button>
-            <h3>Reserve Unit {bookingUnit?.unitNumber}</h3>
+            <h3>Reserve Unit {selectedUnit?.unitNumber}</h3>
             <ReservationForm
-              unit={bookingUnit}
+              unit={selectedUnit}
               onSuccess={handleBookingSubmit}
               onClose={() => {
                 setShowBookingModal(false);
-                setBookingUnit(null);
+                setSelectedUnit(null);
               }}
             />
           </div>

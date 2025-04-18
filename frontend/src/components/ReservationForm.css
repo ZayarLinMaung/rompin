@@ -1,117 +1,172 @@
-.reservation-form {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #fff;
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #dce4ec;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #95a5a6;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background-color: #f8f9fa;
+  color: #7f8c8d;
+}
+
+.booking-form {
+  padding: 20px;
+  margin: 0;
 }
 
 .form-section {
-  margin-bottom: 24px;
-  padding: 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  margin-bottom: 30px;
+  padding: 20px;
   background-color: #f8f9fa;
+  border-radius: 8px;
 }
 
-.form-section h4 {
-  margin: 0 0 16px;
+.form-section-title {
+  margin-bottom: 20px;
   color: #2c3e50;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   font-weight: 600;
 }
 
-.form-group {
-  margin-bottom: 16px;
+.form-row {
+  margin-bottom: 15px;
 }
 
-.form-group label {
+.form-row label {
   display: block;
-  margin-bottom: 8px;
-  color: #4a5568;
+  margin-bottom: 5px;
   font-weight: 500;
+  color: #34495e;
 }
 
-.form-group input[type="text"],
-.form-group input[type="tel"],
-.form-group textarea {
+.form-row input[type="text"],
+.form-row input[type="tel"],
+.form-row textarea {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #cbd5e0;
+  border: 1px solid #dce4ec;
   border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
+  font-size: 14px;
 }
 
-.form-group textarea {
+.form-row input[type="file"] {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.form-row textarea {
   min-height: 100px;
   resize: vertical;
 }
 
-.form-group input[type="file"] {
-  display: block;
-  width: 100%;
-  padding: 8px;
-  border: 1px dashed #cbd5e0;
-  border-radius: 4px;
-  background-color: #f7fafc;
-}
-
-.form-group input.error,
-.form-group textarea.error {
-  border-color: #e53e3e;
-}
-
-.error-text {
-  display: block;
-  margin-top: 4px;
-  color: #e53e3e;
-  font-size: 0.875rem;
+.form-row input.error,
+.form-row textarea.error {
+  border-color: #e74c3c;
 }
 
 .error-message {
-  margin-bottom: 16px;
-  padding: 12px;
-  background-color: #fff5f5;
-  border: 1px solid #feb2b2;
-  border-radius: 4px;
-  color: #c53030;
+  color: #e74c3c;
+  font-size: 12px;
+  margin-top: 5px;
 }
 
-.form-actions {
+.submit-error {
+  margin: 20px 0;
+  padding: 10px;
+  background-color: #fdeaea;
+  border: 1px solid #e74c3c;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #dce4ec;
 }
 
-.form-actions button {
+.btn {
   padding: 8px 16px;
-  border: none;
   border-radius: 4px;
-  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
-.form-actions button[type="button"] {
-  background-color: #e2e8f0;
-  color: #4a5568;
-}
-
-.form-actions button[type="submit"] {
-  background-color: #4299e1;
-  color: white;
-}
-
-.form-actions button:hover {
-  opacity: 0.9;
-}
-
-.form-actions button:disabled {
-  opacity: 0.6;
+.btn:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #3498db;
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.btn-secondary {
+  background-color: #95a5a6;
+  color: white;
+  border: none;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #7f8c8d;
 }
 
 /* Helper text styles */
@@ -123,7 +178,12 @@
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
-  .reservation-form {
+  .modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .booking-form {
     padding: 16px;
   }
 
@@ -131,11 +191,12 @@
     padding: 12px;
   }
 
-  .form-actions {
+  .modal-footer {
     flex-direction: column;
+    padding: 16px;
   }
 
-  .form-actions button {
+  .btn {
     width: 100%;
   }
 }

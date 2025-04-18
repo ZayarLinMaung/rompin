@@ -3,30 +3,54 @@ import "./UnitCard.css";
 
 const UnitCard = ({ unit, onUnitClick, onBookingClick, isAdmin = false }) => {
   const getStatusClass = () => {
-    const status = unit.status.toLowerCase();
+    const status = unit.status;
     switch (status) {
-      case "booked":
-        return "booked";
-      case "reserved":
-        return "reserved";
-      case "available":
-        return "available";
+      case "ADVISE":
+        return "advise";
+      case "PRESENT":
+        return "present";
+      case "LA SIGNED":
+        return "la-signed";
+      case "SPA SIGNED":
+        return "spa-signed";
+      case "LOAN APPROVED":
+        return "loan-approved";
+      case "PENDING BUYER DOC":
+        return "pending-buyer";
+      case "LANDOWNER UNIT":
+        return "landowner";
+      case "LOAN IN PROCESS":
+        return "loan-process";
+      case "NEW BOOK":
+        return "new-book";
       default:
-        return "available";
+        return "advise";
     }
   };
 
   const getStatusText = () => {
-    const status = unit.status.toLowerCase();
+    const status = unit.status;
     switch (status) {
-      case "booked":
-        return "Booked";
-      case "reserved":
-        return "Reserved";
-      case "available":
-        return "Available";
+      case "ADVISE":
+        return "Advise";
+      case "PRESENT":
+        return "Present";
+      case "LA SIGNED":
+        return "LA Signed";
+      case "SPA SIGNED":
+        return "SPA Signed";
+      case "LOAN APPROVED":
+        return "Loan Approved";
+      case "PENDING BUYER DOC":
+        return "Pending Buyer Doc";
+      case "LANDOWNER UNIT":
+        return "Landowner Unit";
+      case "LOAN IN PROCESS":
+        return "Loan in Process";
+      case "NEW BOOK":
+        return "New Book";
       default:
-        return "Available";
+        return "Advise";
     }
   };
 
@@ -59,7 +83,7 @@ const UnitCard = ({ unit, onUnitClick, onBookingClick, isAdmin = false }) => {
             Edit
           </button>
         )}
-        {unit.status === "available" && !isAdmin && (
+        {unit.status === "PRESENT" && !isAdmin && (
           <button
             className="action-btn book-btn"
             onClick={(e) => {
